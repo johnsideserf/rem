@@ -4,7 +4,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
 
-use crate::app::{App, Mode, OpType, JUMP_KEYS, file_type_badge, format_size};
+use crate::app::{App, Mode, OpType, JUMP_KEYS, file_type_badge, format_size, icon_for};
 
 /// Truncate string to `max_chars` characters, with ellipsis if needed, padded to `pad_to`.
 fn trunc_pad(s: &str, max_chars: usize, pad_to: usize) -> String {
@@ -112,13 +112,14 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
             spans.push(Span::styled("    ", Style::default().bg(row_bg)));
         }
 
-        // Sigil
-        let sigil = if entry.is_dir { "\u{25a3} " } else { "\u{25fb} " };
-        let mut sigil_style = Style::default().fg(text_color).bg(row_bg);
+        // File icon (Nerd Font glyph)
+        let icon = icon_for(entry);
+        let icon_text = format!("{} ", icon);
+        let mut icon_style = Style::default().fg(text_color).bg(row_bg);
         if is_cut {
-            sigil_style = sigil_style.add_modifier(Modifier::ITALIC);
+            icon_style = icon_style.add_modifier(Modifier::ITALIC);
         }
-        spans.push(Span::styled(sigil, sigil_style));
+        spans.push(Span::styled(icon_text, icon_style));
 
         // Name — check for Rename/Create mode inline editing
         let is_rename_row = is_active && is_cursor && app.mode == Mode::Rename;
@@ -216,7 +217,7 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
     // Create mode: insert a new row at the cursor position
     if is_active && matches!(app.mode, Mode::Create { .. }) {
         let is_dir = matches!(app.mode, Mode::Create { is_dir: true });
-        let sigil = if is_dir { "\u{25a3} " } else { "\u{25fb} " };
+        let icon = if is_dir { "\u{f07b} " } else { "\u{f15b} " };
         let cursor_char = if app.blink_on { "\u{258b}" } else { " " };
         let display = format!("{}{}", app.create_buf, cursor_char);
         let truncated = trunc_pad(&display, name_width, name_width);
@@ -224,7 +225,7 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
         let create_line = Line::from(vec![
             Span::styled("\u{25b6}", Style::default().fg(pal.text_hot).bg(pal.border_mid)),
             Span::styled("    ", Style::default().bg(pal.border_mid)),
-            Span::styled(sigil, Style::default().fg(pal.text_hot).bg(pal.border_mid)),
+            Span::styled(icon, Style::default().fg(pal.text_hot).bg(pal.border_mid)),
             Span::styled(truncated, Style::default().fg(pal.text_hot).bg(pal.border_mid)),
         ]);
 

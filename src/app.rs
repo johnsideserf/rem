@@ -334,3 +334,76 @@ pub fn file_type_badge(entry: &FsEntry) -> &'static str {
         }
     }
 }
+
+/// Nerd Font icon glyph for a file entry.
+pub fn icon_for(entry: &FsEntry) -> &'static str {
+    if entry.is_dir {
+        // Check for special directory names
+        match entry.name.as_str() {
+            ".git" => "\u{e5fb}",        // git branch icon
+            "src" => "\u{f121}",          // code icon
+            "target" | "build" | "dist" => "\u{f487}",  // package icon
+            "node_modules" => "\u{e718}", // nodejs icon
+            ".github" => "\u{f408}",     // github icon
+            _ => "\u{f07b}",             // folder icon
+        }
+    } else {
+        // Check for special filenames first
+        match entry.name.as_str() {
+            ".gitignore" | ".gitmodules" | ".gitattributes" => "\u{e5fb}",
+            "Cargo.toml" | "Cargo.lock" => "\u{e7a8}",
+            "Dockerfile" | "docker-compose.yml" => "\u{f308}",
+            "Makefile" | "CMakeLists.txt" => "\u{f085}",
+            "LICENSE" | "LICENSE.md" => "\u{f0e3}",
+            _ => {
+                // Match by extension
+                match entry.name.rsplit('.').next() {
+                    Some(ext) => match ext.to_lowercase().as_str() {
+                        "rs" => "\u{e7a8}",              // rust
+                        "py" => "\u{e73c}",              // python
+                        "js" | "mjs" | "cjs" => "\u{e781}",  // javascript
+                        "ts" | "tsx" => "\u{e628}",      // typescript
+                        "jsx" => "\u{e7ba}",             // react
+                        "go" => "\u{e626}",              // go
+                        "c" => "\u{e61e}",               // c
+                        "cpp" | "cc" | "cxx" => "\u{e61d}", // c++
+                        "h" | "hpp" => "\u{e61e}",       // c header
+                        "cs" => "\u{f81a}",              // c#
+                        "java" => "\u{e738}",            // java
+                        "rb" => "\u{e739}",              // ruby
+                        "php" => "\u{e73d}",             // php
+                        "swift" => "\u{e755}",           // swift
+                        "kt" | "kts" => "\u{e634}",     // kotlin
+                        "lua" => "\u{e620}",             // lua
+                        "sh" | "bash" | "zsh" | "fish" => "\u{e795}",  // shell
+                        "ps1" => "\u{e70e}",             // powershell
+                        "html" | "htm" => "\u{e736}",    // html
+                        "css" | "scss" | "sass" | "less" => "\u{e749}", // css
+                        "json" => "\u{e60b}",            // json
+                        "yaml" | "yml" => "\u{e6a8}",   // yaml
+                        "toml" => "\u{e615}",            // config
+                        "xml" => "\u{f121}",             // code
+                        "md" | "mdx" => "\u{e73e}",     // markdown
+                        "txt" => "\u{f15c}",             // text file
+                        "pdf" => "\u{f1c1}",             // pdf
+                        "doc" | "docx" => "\u{f1c2}",   // word
+                        "xls" | "xlsx" => "\u{f1c3}",   // excel
+                        "png" | "jpg" | "jpeg" | "gif" | "bmp" | "ico" | "webp" => "\u{f1c5}", // image
+                        "svg" => "\u{f1c5}",             // image
+                        "mp3" | "wav" | "flac" | "ogg" | "aac" => "\u{f1c7}", // audio
+                        "mp4" | "mkv" | "avi" | "mov" | "webm" => "\u{f1c8}", // video
+                        "zip" | "tar" | "gz" | "bz2" | "xz" | "7z" | "rar" => "\u{f1c6}", // archive
+                        "exe" | "msi" => "\u{f013}",    // executable
+                        "dll" | "so" | "dylib" => "\u{f013}", // library
+                        "lock" => "\u{f023}",            // lock
+                        "log" => "\u{f18d}",             // log
+                        "env" => "\u{f462}",             // environment
+                        "sql" | "db" | "sqlite" => "\u{f1c0}", // database
+                        _ => "\u{f15b}",                 // generic file
+                    },
+                    None => "\u{f15b}",
+                }
+            }
+        }
+    }
+}
