@@ -86,6 +86,16 @@ impl Throbber {
         }
     }
 
+    /// Create a throbber with custom frame set from a symbol set.
+    pub fn from_frames(frames: &'static [&'static str], kind: ThrobberKind) -> Self {
+        Self {
+            frames,
+            current: 0,
+            tick_divisor: kind.tick_divisor(),
+            tick_count: 0,
+        }
+    }
+
     /// Advance one tick. The frame only changes when tick_count reaches tick_divisor.
     pub fn tick(&mut self) {
         self.tick_count += 1;

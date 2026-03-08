@@ -253,21 +253,22 @@ fn render_bulk_rename(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     lines.push(Line::from(Span::raw("")));
 
     // Find field
-    let find_label = if app.bulk_field == 0 { "\u{25b6} Find:    " } else { "  Find:    " };
+    let sym = &app.symbols;
+    let find_label = if app.bulk_field == 0 { format!("{} Find:    ", sym.cursor) } else { "  Find:    ".to_string() };
     lines.push(Line::from(vec![
         Span::styled(find_label, Style::default().fg(pal.text_mid).bg(pal.bg)),
         Span::styled(
-            format!("{}\u{2588}", &app.bulk_find),
+            format!("{}{}", &app.bulk_find, sym.text_cursor),
             Style::default().fg(if app.bulk_field == 0 { pal.text_hot } else { pal.text_dim }).bg(pal.bg),
         ),
     ]));
 
     // Replace field
-    let repl_label = if app.bulk_field == 1 { "\u{25b6} Replace: " } else { "  Replace: " };
+    let repl_label = if app.bulk_field == 1 { format!("{} Replace: ", sym.cursor) } else { "  Replace: ".to_string() };
     lines.push(Line::from(vec![
         Span::styled(repl_label, Style::default().fg(pal.text_mid).bg(pal.bg)),
         Span::styled(
-            format!("{}\u{2588}", &app.bulk_replace),
+            format!("{}{}", &app.bulk_replace, sym.text_cursor),
             Style::default().fg(if app.bulk_field == 1 { pal.text_hot } else { pal.text_dim }).bg(pal.bg),
         ),
     ]));
@@ -286,7 +287,7 @@ fn render_bulk_rename(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             name.clone()
         };
         let changed = name != new_name;
-        let arrow = if changed { " \u{2192} " } else { " = " };
+        let arrow = if changed { format!(" {} ", sym.arrow_right) } else { " = ".to_string() };
         let display = format!(" {}{}{}", name, arrow, new_name);
         let truncated = if display.chars().count() > inner_w {
             let t: String = display.chars().take(inner_w.saturating_sub(1)).collect();

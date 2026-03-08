@@ -4,6 +4,7 @@ use std::sync::mpsc;
 use std::time::{Instant, SystemTime};
 
 use crate::palette::Palette;
+use crate::symbols::SymbolSet;
 use crate::sysmon::SysMon;
 use crate::throbber::{Throbber, ThrobberKind};
 
@@ -451,6 +452,7 @@ pub struct App {
     pub blink_on: bool,
     pub last_blink: Instant,
     pub palette: Palette,
+    pub symbols: SymbolSet,
     pub should_quit: bool,
     pub selected_path: Option<PathBuf>,
     pub last_dir_before_jump: Option<PathBuf>,
@@ -492,7 +494,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(start_dir: PathBuf, palette: Palette) -> Self {
+    pub fn new(start_dir: PathBuf, palette: Palette, symbols: SymbolSet) -> Self {
         let mut app = Self {
             panes: [PaneState::new(start_dir.clone()), PaneState::new(start_dir)],
             active_pane: 0,
@@ -506,10 +508,11 @@ impl App {
             blink_on: true,
             last_blink: Instant::now(),
             palette,
+            symbols,
             should_quit: false,
             selected_path: None,
             last_dir_before_jump: None,
-            heartbeat: Throbber::new(ThrobberKind::Heartbeat, palette.variant),
+            heartbeat: Throbber::from_frames(symbols.heartbeat_frames, ThrobberKind::Heartbeat),
             visual_marks: std::collections::HashSet::new(),
             op_buffer: None,
             rename_buf: String::new(),
@@ -700,7 +703,10 @@ pub fn file_type_badge(entry: &FsEntry) -> &'static str {
 }
 
 /// Nerd Font icon glyph for a file entry.
-pub fn icon_for(entry: &FsEntry) -> &'static str {
+pub fn icon_for(entry: &FsEntry, symbols: &SymbolSet) -> &'static str {
+    if !symbols.use_nerd_fonts {
+        return if entry.is_dir { symbols.dir_icon } else { symbols.file_icon };
+    }
     if entry.is_dir {
         // Check for special directory names
         match entry.name.as_str() {

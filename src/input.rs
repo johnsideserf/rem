@@ -497,29 +497,57 @@ fn toggle_mark_at_cursor(app: &mut App) {
 }
 
 fn handle_theme_picker(app: &mut App, key: KeyEvent) {
+    let total = crate::ui::theme_picker::total_picker_items();
+    let color_count = crate::ui::theme_picker::THEME_COUNT;
     match key.code {
         KeyCode::Esc | KeyCode::Char('t') | KeyCode::Char('q') => {
             app.show_theme_picker = false;
         }
         KeyCode::Char('j') | KeyCode::Down => {
-            app.theme_picker_cursor = (app.theme_picker_cursor + 1)
-                % crate::ui::theme_picker::THEME_COUNT;
+            app.theme_picker_cursor = (app.theme_picker_cursor + 1) % total;
         }
         KeyCode::Char('k') | KeyCode::Up => {
             app.theme_picker_cursor = app.theme_picker_cursor
                 .checked_sub(1)
-                .unwrap_or(crate::ui::theme_picker::THEME_COUNT - 1);
+                .unwrap_or(total - 1);
         }
         KeyCode::Enter => {
-            let new_palette = crate::ui::theme_picker::palette_for_index(
-                app.theme_picker_cursor,
-            );
-            app.palette = new_palette;
-            app.heartbeat = Throbber::new(ThrobberKind::Heartbeat, new_palette.variant);
-            if let Some(throb) = &mut app.telemetry_throbber {
-                *throb = Throbber::new(ThrobberKind::Processing, new_palette.variant);
+            if app.theme_picker_cursor < color_count {
+                // Color theme selection
+                let new_palette = crate::ui::theme_picker::palette_for_index(
+                    app.theme_picker_cursor,
+                );
+                app.palette = new_palette;
+                app.heartbeat = Throbber::from_frames(
+                    app.symbols.heartbeat_frames,
+                    ThrobberKind::Heartbeat,
+                );
+                if let Some(throb) = &mut app.telemetry_throbber {
+                    *throb = Throbber::from_frames(
+                        app.symbols.throbber_frames,
+                        ThrobberKind::Processing,
+                    );
+                }
+                crate::config::save_theme(new_palette.variant);
+            } else {
+                // Symbol set selection
+                let sym_idx = app.theme_picker_cursor - color_count;
+                if let Some(&variant) = crate::symbols::SymbolVariant::ALL.get(sym_idx) {
+                    let new_symbols = crate::symbols::SymbolSet::for_variant(variant);
+                    app.symbols = new_symbols;
+                    app.heartbeat = Throbber::from_frames(
+                        new_symbols.heartbeat_frames,
+                        ThrobberKind::Heartbeat,
+                    );
+                    if let Some(throb) = &mut app.telemetry_throbber {
+                        *throb = Throbber::from_frames(
+                            new_symbols.throbber_frames,
+                            ThrobberKind::Processing,
+                        );
+                    }
+                    crate::config::save_symbols(variant);
+                }
             }
-            crate::config::save_theme(new_palette.variant);
             app.show_theme_picker = false;
         }
         _ => {}

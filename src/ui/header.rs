@@ -27,16 +27,16 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     // Left side: status info
     let mut spans = vec![
         Span::styled(" REM", Style::default().fg(pal.text_hot).add_modifier(Modifier::BOLD)),
-        Span::styled("  \u{00b7}  ", Style::default().fg(pal.text_dim)),
+        Span::styled(format!("  {}  ", app.symbols.separator), Style::default().fg(pal.text_dim)),
         Span::styled("FILE SYSTEM", Style::default().fg(pal.text_mid)),
-        Span::styled("  \u{00b7}  ", Style::default().fg(pal.text_dim)),
+        Span::styled(format!("  {}  ", app.symbols.separator), Style::default().fg(pal.text_dim)),
         Span::styled(format!("ITEMS:{}", item_count), Style::default().fg(pal.text_hot)),
     ];
 
     // Git branch
     if let Some(git) = &app.git_info {
         spans.push(Span::styled("  \u{00b7}  ", Style::default().fg(pal.text_dim)));
-        let dirty_sigil = if git.dirty { "\u{25c6}" } else { "" };
+        let dirty_sigil = if git.dirty { app.symbols.git_dirty } else { "" };
         let branch_display = if git.branch.chars().count() > 20 {
             let t: String = git.branch.chars().take(19).collect();
             format!("{}\u{2026}", t)
@@ -88,7 +88,7 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     // Right side: corporate badge
     let logo_spans = vec![
         Span::styled(
-            "\u{25c6}",
+            app.symbols.mark,
             Style::default().fg(pal.border_hot).bg(pal.surface),
         ),
         Span::styled(

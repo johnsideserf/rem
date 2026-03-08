@@ -52,7 +52,7 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect, show_c
 
     // Blinking cursor (only on active pane)
     if show_cursor && app.blink_on {
-        spans.push(Span::styled(" \u{258b}", Style::default().fg(pal.text_hot)));
+        spans.push(Span::styled(format!(" {}", app.symbols.text_cursor), Style::default().fg(pal.text_hot)));
     } else {
         spans.push(Span::styled("  ", Style::default()));
     }

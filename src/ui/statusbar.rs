@@ -40,7 +40,7 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         let bar_width = 20usize.min(width.saturating_sub(40));
         let filled = (pct as usize * bar_width / 100).min(bar_width);
         let empty = bar_width.saturating_sub(filled);
-        let bar = format!("{}{}", "\u{2588}".repeat(filled), "\u{2591}".repeat(empty));
+        let bar = format!("{}{}", app.symbols.bar_fill.repeat(filled), app.symbols.bar_empty.repeat(empty));
 
         let file_display_len = file_display.len();
         let label_len = bg.label.len();

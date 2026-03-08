@@ -44,9 +44,10 @@ fn render_top_border(f: &mut Frame, app: &App, area: Rect) {
     let left_rule_len = 2;
     let right_rule_len = width.saturating_sub(left_rule_len + label.len() + 4 + 3);
 
+    let sym = &app.symbols;
     let spans = vec![
         Span::styled(
-            "\u{2576}\u{2500}".to_string(),
+            sym.rule_left.to_string(),
             Style::default().fg(pal.border_mid),
         ),
         Span::styled(
@@ -58,11 +59,11 @@ fn render_top_border(f: &mut Frame, app: &App, area: Rect) {
             Style::default().fg(pal.text_dim).bg(pal.bg),
         ),
         Span::styled(
-            "\u{2500}".repeat(right_rule_len),
+            sym.rule_fill.repeat(right_rule_len),
             Style::default().fg(pal.border_mid),
         ),
         Span::styled(
-            "\u{2574}",
+            sym.rule_right,
             Style::default().fg(pal.border_mid),
         ),
     ];
@@ -91,8 +92,9 @@ fn render_disks_and_vitals(f: &mut Frame, app: &App, area: Rect) {
 
         let filled = (pct as usize * bar_width / 100).min(bar_width);
         let empty = bar_width.saturating_sub(filled);
-        let bar_filled = "\u{2588}".repeat(filled);
-        let bar_empty = "\u{2591}".repeat(empty);
+        let sym = &app.symbols;
+        let bar_filled = sym.bar_fill.repeat(filled);
+        let bar_empty = sym.bar_empty.repeat(empty);
 
         // Disk label (mount point, truncated)
         let mount_display = if disk.mount.len() > 4 {
@@ -162,14 +164,15 @@ fn render_disks_and_vitals(f: &mut Frame, app: &App, area: Rect) {
         format_capacity(sysmon.mem_total),
     );
 
+    let sym = &app.symbols;
     lines.push(Line::from(vec![
         Span::styled(" CPU ", Style::default().fg(pal.text_dim).bg(pal.bg)),
         Span::styled(
-            "\u{2588}".repeat(cpu_filled),
+            sym.bar_fill.repeat(cpu_filled),
             Style::default().fg(cpu_color).bg(pal.bg),
         ),
         Span::styled(
-            "\u{2591}".repeat(cpu_empty),
+            sym.bar_empty.repeat(cpu_empty),
             Style::default().fg(pal.border_dim).bg(pal.bg),
         ),
         Span::styled(
@@ -178,11 +181,11 @@ fn render_disks_and_vitals(f: &mut Frame, app: &App, area: Rect) {
         ),
         Span::styled("   MEM ", Style::default().fg(pal.text_dim).bg(pal.bg)),
         Span::styled(
-            "\u{2588}".repeat(mem_filled),
+            sym.bar_fill.repeat(mem_filled),
             Style::default().fg(mem_color).bg(pal.bg),
         ),
         Span::styled(
-            "\u{2591}".repeat(mem_empty),
+            sym.bar_empty.repeat(mem_empty),
             Style::default().fg(pal.border_dim).bg(pal.bg),
         ),
         Span::styled(
@@ -216,8 +219,9 @@ fn render_network(f: &mut Frame, app: &App, area: Rect) {
     let tx_str = format_throughput(sysmon.net.tx_bytes_sec);
     let tx_sparkline = sparkline_str(&sysmon.net.tx_sparkline, pal.variant);
 
+    let sym = &app.symbols;
     lines.push(Line::from(vec![
-        Span::styled(" \u{25b2} TX ", Style::default().fg(pal.text_dim).bg(pal.bg)),
+        Span::styled(format!(" {} TX ", sym.tx_indicator), Style::default().fg(pal.text_dim).bg(pal.bg)),
         Span::styled(
             format!("{:>10}", tx_str),
             Style::default().fg(pal.text_hot).bg(pal.bg),
@@ -234,7 +238,7 @@ fn render_network(f: &mut Frame, app: &App, area: Rect) {
     let rx_sparkline = sparkline_str(&sysmon.net.rx_sparkline, pal.variant);
 
     lines.push(Line::from(vec![
-        Span::styled(" \u{25bc} RX ", Style::default().fg(pal.text_dim).bg(pal.bg)),
+        Span::styled(format!(" {} RX ", sym.rx_indicator), Style::default().fg(pal.text_dim).bg(pal.bg)),
         Span::styled(
             format!("{:>10}", rx_str),
             Style::default().fg(pal.text_mid).bg(pal.bg),

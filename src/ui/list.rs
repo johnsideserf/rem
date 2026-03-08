@@ -4,7 +4,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
 
-use crate::app::{App, Mode, OpType, JUMP_KEYS, file_type_badge, format_size, icon_for, FsEntry};
+use crate::app::{App, FsEntry, Mode, OpType, JUMP_KEYS, file_type_badge, format_size, icon_for};
 
 /// Interpolate between two RGB colors. `t` ranges from 0.0 (fully `from`) to 1.0 (fully `to`).
 fn lerp_color(from: Color, to: Color, t: f32) -> Color {
@@ -119,17 +119,18 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
             ));
         }
 
-        // Indicator column: ▶ cursor, ◆ marked, ✂ cut, ⊕ copied
+        // Indicator column
+        let sym = &app.symbols;
         let indicator = if is_cursor && is_marked {
-            "\u{25c6}" // ◆
+            sym.mark
         } else if is_cursor {
-            "\u{25b6}" // ▶
+            sym.cursor
         } else if is_marked {
-            "\u{25c6}" // ◆
+            sym.mark
         } else if is_cut {
-            "\u{2702}" // ✂
+            sym.cut
         } else if is_copied {
-            "\u{2295}" // ⊕
+            sym.copy
         } else {
             " "
         };
@@ -152,8 +153,8 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
             spans.push(Span::styled("    ", Style::default().bg(row_bg)));
         }
 
-        // File icon (Nerd Font glyph)
-        let icon = icon_for(entry);
+        // File icon
+        let icon = icon_for(entry, &app.symbols);
         let icon_text = format!("{} ", icon);
         let mut icon_style = Style::default().fg(text_color).bg(row_bg);
         if is_cut {
@@ -165,7 +166,7 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
         let is_rename_row = is_active && is_cursor && app.mode == Mode::Rename;
 
         if is_rename_row {
-            let cursor_char = if app.blink_on { "\u{258b}" } else { " " };
+            let cursor_char = if app.blink_on { app.symbols.text_cursor } else { " " };
             let display = format!("{}{}", app.rename_buf, cursor_char);
             let truncated = trunc_pad(&display, name_width, name_width);
             spans.push(Span::styled(truncated, Style::default().fg(pal.text_hot).bg(pal.border_mid)));
@@ -243,7 +244,7 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
         if show_size {
             let size_str = match entry.size {
                 Some(s) => format_size(s),
-                None => "\u{2014}".to_string(),
+                None => app.symbols.em_dash.to_string(),
             };
             spans.push(Span::styled(
                 format!("{:>9}", size_str),
@@ -257,15 +258,15 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
     // Create mode: insert a new row at the cursor position
     if is_active && matches!(app.mode, Mode::Create { .. }) {
         let is_dir = matches!(app.mode, Mode::Create { is_dir: true });
-        let icon = if is_dir { "\u{f07b} " } else { "\u{f15b} " };
-        let cursor_char = if app.blink_on { "\u{258b}" } else { " " };
+        let icon = if is_dir { app.symbols.dir_icon } else { app.symbols.file_icon };
+        let cursor_char = if app.blink_on { app.symbols.text_cursor } else { " " };
         let display = format!("{}{}", app.create_buf, cursor_char);
         let truncated = trunc_pad(&display, name_width, name_width);
 
         let create_line = Line::from(vec![
-            Span::styled("\u{25b6}", Style::default().fg(pal.text_hot).bg(pal.border_mid)),
+            Span::styled(app.symbols.cursor, Style::default().fg(pal.text_hot).bg(pal.border_mid)),
             Span::styled("    ", Style::default().bg(pal.border_mid)),
-            Span::styled(icon, Style::default().fg(pal.text_hot).bg(pal.border_mid)),
+            Span::styled(format!("{} ", icon), Style::default().fg(pal.text_hot).bg(pal.border_mid)),
             Span::styled(truncated, Style::default().fg(pal.text_hot).bg(pal.border_mid)),
         ]);
 
@@ -337,9 +338,9 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
         for row in 0..track_height {
             let y = area.y + row as u16;
             let (ch, color) = if row >= thumb_pos && row < thumb_pos + thumb_size {
-                ("\u{2588}", pal.text_dim)
+                (app.symbols.scroll_thumb, pal.text_dim)
             } else {
-                ("\u{2502}", pal.border_dim)
+                (app.symbols.scroll_track, pal.border_dim)
             };
             let span = Span::styled(ch, Style::default().fg(color).bg(pal.bg));
             f.render_widget(Paragraph::new(Line::from(span)), Rect::new(scroll_x, y, 1, 1));
@@ -406,9 +407,9 @@ pub fn render_rsearch(f: &mut Frame, app: &App, area: Rect) {
             size: None,
             modified: None,
         };
-        let icon = icon_for(&fake_entry);
+        let icon = icon_for(&fake_entry, &app.symbols);
 
-        let indicator = if is_cursor { "\u{25b6}" } else { " " };
+        let indicator = if is_cursor { app.symbols.cursor } else { " " };
         let max_path = width.saturating_sub(4); // indicator + icon + space + padding
 
         let path_display = if display.chars().count() > max_path {

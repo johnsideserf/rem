@@ -4,6 +4,7 @@ use serde::Deserialize;
 
 use crate::app::{RightPanel, SortMode};
 use crate::palette::Palette;
+use crate::symbols::{SymbolSet, SymbolVariant};
 use crate::throbber::PaletteVariant;
 
 #[derive(Deserialize, Default)]
@@ -17,6 +18,7 @@ struct ConfigFile {
 #[derive(Deserialize, Default)]
 struct AppearanceConfig {
     palette: Option<String>,
+    symbols: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -30,6 +32,7 @@ struct BehaviorConfig {
 
 pub struct Config {
     pub palette: Palette,
+    pub symbols: SymbolSet,
     pub show_hidden: bool,
     pub default_panel: RightPanel,
     pub boot_sequence: bool,
@@ -41,6 +44,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             palette: Palette::phosphor_green(),
+            symbols: SymbolSet::for_variant(SymbolVariant::Standard),
             show_hidden: true,
             default_panel: RightPanel::Info,
             boot_sequence: true,
@@ -77,6 +81,27 @@ pub fn save_theme(variant: PaletteVariant) {
             PaletteVariant::Cyan => "cyan",
         };
         t.insert("palette".to_string(), toml::Value::String(name.to_string()));
+    }
+
+    let _ = std::fs::write(&path, doc.to_string());
+}
+
+/// Save the current symbol set to config.toml, preserving other settings.
+pub fn save_symbols(variant: SymbolVariant) {
+    let Some(path) = config_path() else { return };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
+    let mut doc: toml::Table = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or_default();
+
+    let appearance = doc.entry("appearance")
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+    if let toml::Value::Table(t) = appearance {
+        t.insert("symbols".to_string(), toml::Value::String(variant.config_name().to_string()));
     }
 
     let _ = std::fs::write(&path, doc.to_string());
@@ -120,6 +145,9 @@ impl Config {
         if let Some(path) = config_path() {
             if let Ok(content) = std::fs::read_to_string(&path) {
                 if let Ok(file) = toml::from_str::<ConfigFile>(&content) {
+                    if let Some(s) = &file.appearance.symbols {
+                        cfg.symbols = SymbolSet::for_variant(SymbolVariant::from_config(s));
+                    }
                     if let Some(p) = &file.appearance.palette {
                         cfg.palette = match p.as_str() {
                             "amber" => Palette::amber(),

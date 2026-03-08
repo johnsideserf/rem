@@ -8,6 +8,7 @@ mod nav;
 mod ops;
 mod palette;
 mod preview;
+mod symbols;
 mod sysmon;
 mod throbber;
 mod ui;
@@ -29,7 +30,7 @@ fn main() -> io::Result<()> {
     let cfg = Config::load(&args);
 
     let start_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-    let mut app = App::new(start_dir, cfg.palette);
+    let mut app = App::new(start_dir, cfg.palette, cfg.symbols);
     app.right_panel = cfg.default_panel;
     app.show_hidden = cfg.show_hidden;
     app.sort_mode = cfg.sort_mode;

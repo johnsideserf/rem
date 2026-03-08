@@ -32,16 +32,16 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         let msg = match action {
             crate::app::PendingAction::Delete { paths } => {
                 if paths.len() == 1 {
-                    format!(" \u{26a0} DELETE 1 ITEM? THIS CANNOT BE UNDONE.")
+                    format!(" {} DELETE 1 ITEM? THIS CANNOT BE UNDONE.", app.symbols.warning)
                 } else {
-                    format!(" \u{26a0} DELETE {} ITEMS? THIS CANNOT BE UNDONE.", paths.len())
+                    format!(" {} DELETE {} ITEMS? THIS CANNOT BE UNDONE.", app.symbols.warning, paths.len())
                 }
             }
             crate::app::PendingAction::Overwrite { dest, .. } => {
                 let name = dest.file_name()
                     .map(|n| n.to_string_lossy().into_owned())
                     .unwrap_or_default();
-                format!(" \u{26a0} OVERWRITE {}?", name)
+                format!(" {} OVERWRITE {}?", app.symbols.warning, name)
             }
         };
 
@@ -50,7 +50,7 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
             Span::styled("  ", Style::default().bg(pal.surface)),
             Span::styled("y", Style::default().fg(pal.text_mid).bg(pal.surface)),
             Span::styled(" confirm", Style::default().fg(pal.text_dim).bg(pal.surface)),
-            Span::styled("  \u{00b7}  ", Style::default().fg(pal.border_mid).bg(pal.surface)),
+            Span::styled(format!("  {}  ", app.symbols.separator), Style::default().fg(pal.border_mid).bg(pal.surface)),
             Span::styled("n", Style::default().fg(pal.text_mid).bg(pal.surface)),
             Span::styled(" cancel", Style::default().fg(pal.text_dim).bg(pal.surface)),
         ];
@@ -165,11 +165,12 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         Mode::Confirm { .. } => unreachable!(), // handled above
     };
 
+    let sep = format!("  {}  ", app.symbols.separator);
     let mut spans: Vec<Span> = vec![Span::styled(" ", Style::default().bg(pal.surface))];
     for (i, (key, desc)) in hints.iter().enumerate() {
         if i > 0 {
             spans.push(Span::styled(
-                "  \u{00b7}  ",
+                sep.clone(),
                 Style::default().fg(pal.border_mid).bg(pal.surface),
             ));
         }
