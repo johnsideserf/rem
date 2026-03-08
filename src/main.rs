@@ -31,6 +31,8 @@ fn main() -> io::Result<()> {
     let mut app = App::new(start_dir, cfg.palette);
     app.right_panel = cfg.default_panel;
     app.show_hidden = cfg.show_hidden;
+    app.sort_mode = cfg.sort_mode;
+    app.load_entries(); // re-sort with configured sort mode
 
     // Load bookmarks
     app.marks = marks::load_marks();

@@ -1,10 +1,11 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use crate::app::{App, FsEntry, PaneState};
+use crate::app::{App, FsEntry, PaneState, SortMode};
 
 impl App {
     pub fn load_entries(&mut self) {
+        let sort_mode = self.sort_mode;
         let pane = self.pane_mut();
         pane.entries.clear();
         match std::fs::read_dir(&pane.current_dir) {
@@ -22,10 +23,28 @@ impl App {
                         modified,
                     });
                 }
-                // Sort: dirs first, then alphabetical case-insensitive
+                // Sort: dirs first, then by current sort mode
                 pane.entries.sort_by(|a, b| {
-                    b.is_dir.cmp(&a.is_dir)
-                        .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+                    b.is_dir.cmp(&a.is_dir).then_with(|| match sort_mode {
+                        SortMode::NameAsc => {
+                            a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                        }
+                        SortMode::NameDesc => {
+                            b.name.to_lowercase().cmp(&a.name.to_lowercase())
+                        }
+                        SortMode::SizeDesc => {
+                            b.size.unwrap_or(0).cmp(&a.size.unwrap_or(0))
+                        }
+                        SortMode::SizeAsc => {
+                            a.size.unwrap_or(0).cmp(&b.size.unwrap_or(0))
+                        }
+                        SortMode::DateNewest => {
+                            b.modified.cmp(&a.modified)
+                        }
+                        SortMode::DateOldest => {
+                            a.modified.cmp(&b.modified)
+                        }
+                    })
                 });
             }
             Err(e) => {

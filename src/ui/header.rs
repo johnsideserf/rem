@@ -41,6 +41,15 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         ));
     }
 
+    // Sort mode (only show if not default)
+    if app.sort_mode != crate::app::SortMode::NameAsc {
+        spans.push(Span::styled("  \u{00b7}  ", Style::default().fg(pal.text_dim)));
+        spans.push(Span::styled(
+            format!("SORT:{}", app.sort_mode.label()),
+            Style::default().fg(pal.text_hot),
+        ));
+    }
+
     if app.show_telemetry {
         spans.push(Span::styled("  \u{00b7}  ", Style::default().fg(pal.text_dim)));
         spans.push(Span::styled("TELEM:ACTIVE", Style::default().fg(pal.text_hot)));

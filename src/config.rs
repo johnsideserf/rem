@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 
-use crate::app::RightPanel;
+use crate::app::{RightPanel, SortMode};
 use crate::palette::Palette;
 use crate::throbber::PaletteVariant;
 
@@ -24,6 +24,7 @@ struct BehaviorConfig {
     show_hidden: Option<bool>,
     default_panel: Option<String>,
     boot_sequence: Option<bool>,
+    sort_mode: Option<String>,
 }
 
 pub struct Config {
@@ -31,6 +32,7 @@ pub struct Config {
     pub show_hidden: bool,
     pub default_panel: RightPanel,
     pub boot_sequence: bool,
+    pub sort_mode: SortMode,
 }
 
 impl Default for Config {
@@ -40,6 +42,7 @@ impl Default for Config {
             show_hidden: true,
             default_panel: RightPanel::Info,
             boot_sequence: true,
+            sort_mode: SortMode::default(),
         }
     }
 }
@@ -76,6 +79,35 @@ pub fn save_theme(variant: PaletteVariant) {
     let _ = std::fs::write(&path, doc.to_string());
 }
 
+/// Save the current sort mode to config.toml, preserving other settings.
+pub fn save_sort_mode(mode: SortMode) {
+    let Some(path) = config_path() else { return };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
+    let mut doc: toml::Table = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or_default();
+
+    let behavior = doc.entry("behavior")
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+    if let toml::Value::Table(t) = behavior {
+        let name = match mode {
+            SortMode::NameAsc => "name_asc",
+            SortMode::NameDesc => "name_desc",
+            SortMode::SizeDesc => "size_desc",
+            SortMode::SizeAsc => "size_asc",
+            SortMode::DateNewest => "date_newest",
+            SortMode::DateOldest => "date_oldest",
+        };
+        t.insert("sort_mode".to_string(), toml::Value::String(name.to_string()));
+    }
+
+    let _ = std::fs::write(&path, doc.to_string());
+}
+
 impl Config {
     /// Load config from file, then apply CLI overrides.
     pub fn load(args: &[String]) -> Self {
@@ -104,6 +136,16 @@ impl Config {
                     }
                     if let Some(v) = file.behavior.boot_sequence {
                         cfg.boot_sequence = v;
+                    }
+                    if let Some(s) = &file.behavior.sort_mode {
+                        cfg.sort_mode = match s.as_str() {
+                            "name_desc" => SortMode::NameDesc,
+                            "size_desc" => SortMode::SizeDesc,
+                            "size_asc" => SortMode::SizeAsc,
+                            "date_newest" => SortMode::DateNewest,
+                            "date_oldest" => SortMode::DateOldest,
+                            _ => SortMode::NameAsc,
+                        };
                     }
                 }
             }

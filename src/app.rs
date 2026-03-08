@@ -122,6 +122,52 @@ impl PaneState {
     }
 }
 
+#[derive(PartialEq, Eq, Clone, Copy, Default)]
+pub enum SortMode {
+    #[default]
+    NameAsc,
+    NameDesc,
+    SizeAsc,
+    SizeDesc,
+    DateNewest,
+    DateOldest,
+}
+
+impl SortMode {
+    pub fn next(self) -> Self {
+        match self {
+            Self::NameAsc => Self::NameDesc,
+            Self::NameDesc => Self::SizeDesc,
+            Self::SizeDesc => Self::SizeAsc,
+            Self::SizeAsc => Self::DateNewest,
+            Self::DateNewest => Self::DateOldest,
+            Self::DateOldest => Self::NameAsc,
+        }
+    }
+
+    pub fn prev(self) -> Self {
+        match self {
+            Self::NameAsc => Self::DateOldest,
+            Self::NameDesc => Self::NameAsc,
+            Self::SizeDesc => Self::NameDesc,
+            Self::SizeAsc => Self::SizeDesc,
+            Self::DateNewest => Self::SizeAsc,
+            Self::DateOldest => Self::DateNewest,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::NameAsc => "NAME \u{2191}",
+            Self::NameDesc => "NAME \u{2193}",
+            Self::SizeAsc => "SIZE \u{2191}",
+            Self::SizeDesc => "SIZE \u{2193}",
+            Self::DateNewest => "DATE \u{2193}",
+            Self::DateOldest => "DATE \u{2191}",
+        }
+    }
+}
+
 /// Request to open a file externally (handled by main loop).
 pub enum OpenRequest {
     /// Open in $EDITOR
@@ -161,6 +207,7 @@ pub struct App {
     pub show_theme_picker: bool,
     pub theme_picker_cursor: usize,
     pub open_request: Option<OpenRequest>,
+    pub sort_mode: SortMode,
 }
 
 impl App {
@@ -196,6 +243,7 @@ impl App {
             show_theme_picker: false,
             theme_picker_cursor: 0,
             open_request: None,
+            sort_mode: SortMode::default(),
         };
         app.load_entries();
         app

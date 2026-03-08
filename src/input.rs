@@ -171,6 +171,16 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
         (KeyModifiers::NONE, KeyCode::Char('e')) => {
             app.edit_selected();
         }
+        (KeyModifiers::NONE, KeyCode::Char('s')) => {
+            app.sort_mode = app.sort_mode.next();
+            app.load_entries();
+            crate::config::save_sort_mode(app.sort_mode);
+        }
+        (KeyModifiers::SHIFT, KeyCode::Char('S')) => {
+            app.sort_mode = app.sort_mode.prev();
+            app.load_entries();
+            crate::config::save_sort_mode(app.sort_mode);
+        }
         (KeyModifiers::SHIFT, KeyCode::Char('H')) => {
             app.show_hidden = !app.show_hidden;
             app.rebuild_filtered();

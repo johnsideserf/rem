@@ -86,6 +86,7 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
                 h.push(("u", "clear"));
             }
             h.push(("r", "rename"));
+            h.push(("s", "sort"));
             h.push(("tab", "panel"));
             h.push(("[]", "resize"));
             h.push(("t", "theme"));
