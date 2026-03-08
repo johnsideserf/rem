@@ -32,6 +32,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         Mode::WaitingForJumpToMark => handle_jump_mark(app, key),
         Mode::WaitingForYank => handle_waiting_yank(app, key),
         Mode::WaitingForCut => handle_waiting_cut(app, key),
+        Mode::WaitingForDeleteMark => handle_delete_mark(app, key),
     }
 }
 
@@ -95,6 +96,9 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
         }
         (KeyModifiers::NONE, KeyCode::Char('\'')) => {
             app.mode = Mode::WaitingForJumpToMark;
+        }
+        (KeyModifiers::SHIFT, KeyCode::Char('M')) => {
+            app.mode = Mode::WaitingForDeleteMark;
         }
         (KeyModifiers::NONE, KeyCode::Tab) => {
             if app.dual_pane {
@@ -224,6 +228,19 @@ fn handle_jump_mark(app: &mut App, key: KeyEvent) {
     if let KeyCode::Char(c) = key.code {
         if c.is_ascii_lowercase() || c == '\'' {
             app.jump_to_mark(c);
+        }
+    }
+    app.mode = Mode::Normal;
+}
+
+fn handle_delete_mark(app: &mut App, key: KeyEvent) {
+    if let KeyCode::Char(c) = key.code {
+        if c.is_ascii_lowercase() {
+            if app.marks.remove(&c).is_some() {
+                crate::marks::save_marks(&app.marks);
+            } else {
+                app.error = Some((format!("MARK '{}' NOT SET", c), std::time::Instant::now()));
+            }
         }
     }
     app.mode = Mode::Normal;

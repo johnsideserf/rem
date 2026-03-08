@@ -69,7 +69,8 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
 
     let hints: Vec<(&str, &str)> = match app.mode {
         Mode::Normal | Mode::WaitingForG | Mode::WaitingForMark
-        | Mode::WaitingForJumpToMark | Mode::WaitingForYank | Mode::WaitingForCut => {
+        | Mode::WaitingForJumpToMark | Mode::WaitingForYank | Mode::WaitingForCut
+        | Mode::WaitingForDeleteMark => {
             let mut h = vec![
                 ("hjkl", "move"),
                 ("enter", "open"),

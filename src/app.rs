@@ -36,8 +36,9 @@ pub enum Mode {
     WaitingForG,
     WaitingForMark,
     WaitingForJumpToMark,
-    WaitingForYank,   // first 'y' pressed, awaiting second 'y'
-    WaitingForCut,    // first 'd' pressed, awaiting second 'd'
+    WaitingForYank,       // first 'y' pressed, awaiting second 'y'
+    WaitingForCut,        // first 'd' pressed, awaiting second 'd'
+    WaitingForDeleteMark, // 'M' pressed, awaiting key to delete mark
 }
 
 #[derive(PartialEq, Eq, Clone)]
