@@ -1,6 +1,6 @@
 # rem
 
-> **RESOURCE EXTRACTION MANAGER** -- Weyland-Yutani Corp. Standard-Issue File Navigation Terminal
+> **REMOTE ENTRY MODULE** -- Weyland-Yutani Corp. Standard-Issue File Navigation Terminal
 >
 > *Classified under WY-DOC-4789. Unauthorized access is a violation of ICC corporate law.*
 
