@@ -5,6 +5,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 
 use crate::app::App;
+use crate::highlight;
 use crate::preview::{PreviewContent, load_preview};
 
 /// Truncate a string to at most `max_chars` characters, appending `…` if truncated.
@@ -76,11 +77,12 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
                     let total = text_lines.len();
                     let scroll = app.preview_scroll.min(total.saturating_sub(1));
                     for line in text_lines.iter().skip(scroll).take(height.saturating_sub(1)) {
-                        let display = format!(" {}", truncate_chars(line, width.saturating_sub(1)));
-                        lines.push(Line::from(Span::styled(
-                            display,
-                            Style::default().fg(pal.text_dim).bg(pal.bg),
-                        )));
+                        let truncated = truncate_chars(line, width.saturating_sub(1));
+                        let mut hl_spans = vec![
+                            Span::styled(" ", Style::default().bg(pal.bg)),
+                        ];
+                        hl_spans.extend(highlight::highlight_line(&truncated, &entry.path, &pal));
+                        lines.push(Line::from(hl_spans));
                     }
                 }
                 PreviewContent::Binary => {

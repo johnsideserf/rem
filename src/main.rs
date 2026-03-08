@@ -1,5 +1,6 @@
 mod app;
 mod config;
+mod highlight;
 mod input;
 mod logo;
 mod marks;
