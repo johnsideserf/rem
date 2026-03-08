@@ -96,3 +96,22 @@
 - [x] **9.1** Config file loading — read `~/.config/rem/config.toml`, apply settings
 - [x] **9.2** `--no-boot` CLI flag
 - [x] **9.3** Hidden files toggle — respect `show_hidden` config, filter dot-prefixed entries
+
+## Phase 10 — Extended Features
+
+- [x] **10.1** Dead code cleanup — remove compiler warnings (#1)
+- [x] **10.2** Persist theme choice — save/load palette selection in config (#2)
+- [x] **10.3** File opener — launch `$EDITOR` or system default on Enter for files (#3)
+- [x] **10.4** Persist bookmarks — save/load navigation marks to `~/.config/rem/marks.toml` (#4)
+- [x] **10.5** Sort modes — toggle between name, size, and date with `s` key (#5)
+- [x] **10.6** Recursive file search — `S` to search across all subdirectories (#6)
+- [x] **10.7** Bulk rename — `R` in visual mode for find/replace pattern renaming (#7)
+- [x] **10.8** Syntax-highlighted file preview — language-aware coloring in preview pane (#8)
+- [x] **10.9** Nerd Font file icons — extension-based glyphs with fallback for non-nerd-font sets (#9)
+
+## Phase 11 — Polish & Enhancement
+
+- [x] **11.1** Smooth directory transition animations — color fade + horizontal slide on navigate (#10)
+- [x] **11.2** In-app text editor — `e` to edit files with syntax highlighting, undo, and save (#11)
+- [x] **11.3** Symbol set picker — 7 swappable glyph styles (Standard, ASCII, Block, Minimal, Pipeline, Braille, Scanline) (#12)
+- [x] **11.4** Git branch display — show current branch and dirty status in header bar (#13)

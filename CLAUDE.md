@@ -23,19 +23,33 @@ The binary crate (`rem`) uses Rust 2024 edition. Entry point is `src/main.rs`.
 
 ### Core modules
 
-- **`main.rs`** — Terminal setup/teardown (crossterm alternate screen + raw mode), event loop (`run_loop`), and all key event handlers (`handle_key` dispatches by `Mode`). Bookmark load/save wraps the loop.
-- **`app.rs`** — `App` struct (all state), `Mode` enum (Normal, FuzzySearch, JumpKey, WaitingForG, WaitingForMark, WaitingForJumpToMark), `FsEntry`, navigation methods, fuzzy filtering via `fuzzy-matcher` SkimMatcherV2. Contains `JUMP_KEYS` (homerow-first letter ordering) and helper functions `format_size`, `file_type_badge`.
+- **`main.rs`** — Terminal setup/teardown (crossterm alternate screen + raw mode), event loop (`run_loop`). Bookmark load/save wraps the loop.
+- **`app.rs`** — `App` struct (all state), `Mode` enum (Normal, FuzzySearch, JumpKey, Visual, Rename, Create, Confirm, RecursiveSearch, BulkRename, Edit, and waiting states), `FsEntry`, `GitInfo`, `EditorState`. Contains `JUMP_KEYS`, helper functions `format_size`, `file_type_badge`, `icon_for`.
+- **`input.rs`** — All key event handlers. `handle_key` dispatches by `Mode` to dedicated handlers (normal, visual, rename, create, confirm, fuzzy, edit, bulk rename, theme picker, etc.).
+- **`nav.rs`** — Directory reading, sorting, navigation methods. Git info detection, animation triggers, editor open/close.
 - **`palette.rs`** — `Palette` struct with 9 named RGB colors. Three constructors: `phosphor_green()`, `amber()`, `degraded_cyan()`. Passed by copy into all render functions.
+- **`symbols.rs`** — `SymbolVariant` enum (7 variants) and `SymbolSet` struct defining all UI glyphs. Seven constructors: `standard()`, `ascii()`, `block()`, `minimal()`, `pipeline()`, `braille()`, `scanline()`.
+- **`config.rs`** — Parse/save `~/.config/rem/config.toml` (palette, symbols, show_hidden, default_panel, boot_sequence).
 - **`marks.rs`** — Bookmark persistence to `~/.config/rem/marks.toml` via serde + toml.
+- **`ops.rs`** — `OpBuffer` struct, file copy/move/delete implementations, background operations.
+- **`throbber.rs`** — `Throbber` struct with frame arrays for Data Stream, Processing, Heartbeat. `from_frames()` for symbol-set-driven animations.
+- **`highlight.rs`** — Syntax highlighting for preview pane and editor, language detection by extension.
+- **`sysmon.rs`** — System telemetry (CPU, RAM, disk, network) via `sysinfo` crate.
 
 ### UI modules (`src/ui/`)
 
-- **`mod.rs`** — Top-level `render()` that splits the frame into header (2 rows), breadcrumb (2 rows), body (flex), footer (1 row). Sidebar shows when terminal width >= 100.
-- **`header.rs`** — Title bar with item count and system status.
+- **`mod.rs`** — Top-level `render()` that splits the frame into header (2 rows), breadcrumb (2 rows), body (flex), telemetry (conditional), status bar (conditional), footer (1 row). Manages single-pane vs dual-pane layout. Bulk rename popup overlay.
+- **`header.rs`** — Title bar with item count, git branch/dirty status, system heartbeat.
 - **`breadcrumb.rs`** — Path segments with left-truncation and blinking cursor.
-- **`list.rs`** — File list with responsive column hiding (size at 90+, type at 80+), scrollbar rendering, fuzzy search overlay on last row, jump key overlay.
+- **`list.rs`** — File list with responsive column hiding, scrollbar, fuzzy/recursive search overlays, jump key overlay, animated transitions (color fade + slide).
 - **`sidebar.rs`** — Selection metadata and bookmarks panel.
-- **`footer.rs`** — Context-sensitive key hints; error state overrides footer with auto-dismiss.
+- **`preview.rs`** — Syntax-highlighted file preview with scroll support.
+- **`editor.rs`** — In-app text editor with gutter, syntax highlighting, cursor blink, unsaved changes confirmation.
+- **`statusbar.rs`** — Operation progress bar (throbber + label + path + determinate bar) and feedback messages.
+- **`telemetry.rs`** — CPU/RAM/disk/network gauges with symbol-set-aware bars.
+- **`theme_picker.rs`** — Popup for selecting color profiles and symbol sets.
+- **`footer.rs`** — Context-sensitive key hints per mode; warning display.
+- **`boot.rs`** — Boot sequence animation.
 
 ### Key data flow
 
@@ -55,7 +69,7 @@ Key rules from the theme doc:
 - All borders use `BorderType::Plain`, never Rounded or Double
 - Colors always come from `&Palette`, never hardcoded in render logic
 - Labels are UPPERCASE, terse, bureaucratic
-- Sigils are ASCII/Unicode only (▣ dir, ◻ file, ▶ selected, ◆ marked), no emoji
+- Sigils come from the active `SymbolSet` (cursor, mark, cut, copy, checkmark, warning, etc.), no emoji
 - Text truncates with `…`, never wraps. Paths truncate on the left; names on the right.
 - Tick rate 100ms, cursor blink toggles every 550ms
-- Throbbers use per-palette character sets (braille for green, block elements for amber, glitchy sparse for cyan)
+- Throbbers/heartbeat frames are driven by the active symbol set

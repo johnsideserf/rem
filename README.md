@@ -39,17 +39,24 @@ A corporate-grade terminal file navigator built in Rust with [ratatui](https://r
 
 ### Terminal Capabilities
 
-- **Navigation** -- vim-keyed traversal (`hjkl`), jump-to-top/bottom (`gg`/`G`), fuzzy asset search (`/`)
+- **Navigation** -- vim-keyed traversal (`hjkl`), jump-to-top/bottom (`gg`/`G`), smooth animated transitions
 - **Dual-pane operations** -- `Tab` to deploy split-view for cross-directory transfers
 - **Visual targeting** -- `v` to enter selection mode, mark multiple assets with `j`/`k`
 - **Asset management** -- `yy` copy, `dd` cut, `p` paste, `D` purge (requires confirmation)
+- **Bulk rename** -- `R` in visual mode for find/replace pattern renaming across selections
 - **Fuzzy search** -- `/` to locate assets in the current directory via pattern matching
+- **Recursive search** -- `S` to search across all subdirectories
 - **Jump keys** -- `f` to display single-key target labels on all visible entries
 - **Navigation marks** -- `m` + key to designate a waypoint, `'` + key to return
-- **Asset preview** -- side panel with scrollable file contents
+- **Asset preview** -- side panel with syntax-highlighted, scrollable file contents
+- **In-app editor** -- `e` to edit files with syntax highlighting, undo stack, and save
 - **Rename & provision** -- `r` to rename, `a` to create file, `A` to create directory
+- **Sort modes** -- `s` to cycle between name, size, and date ordering
+- **Git integration** -- current branch and dirty status displayed in header
+- **Nerd Font icons** -- extension-based file icons with fallback for standard terminals
+- **Symbol sets** -- 7 swappable glyph styles via theme picker (Standard, ASCII, Block, Minimal, Pipeline, Braille, Scanline)
 - **System telemetry** -- `` ` `` to monitor CPU, RAM, disk, and network diagnostics
-- **Display profiles** -- `t` to open the theme selector
+- **Display profiles** -- `t` to open the theme and symbol set selector
 - **Viewport adjustment** -- `[` / `]` to resize the preview panel
 - **Boot sequence** -- corporate authentication splash with animated WY mark
 
@@ -80,6 +87,7 @@ A corporate-grade terminal file navigator built in Rust with [ratatui](https://r
 | Input | Function |
 |-------|----------|
 | `/` | Fuzzy search current directory |
+| `S` | Recursive search across subdirectories |
 | `f` | Deploy jump key overlay |
 | `m` + key | Set navigation mark |
 | `'` + key | Jump to navigation mark |
@@ -92,8 +100,16 @@ A corporate-grade terminal file navigator built in Rust with [ratatui](https://r
 | `p` | Paste from operations buffer |
 | `D` | Purge selection (confirmation required) |
 | `r` | Rename asset |
+| `R` | Bulk rename (visual mode -- find/replace) |
 | `a` | Provision new file |
 | `A` | Provision new directory |
+| `e` | Open in-app text editor |
+| `E` | Open in external `$EDITOR` |
+
+#### Sorting
+| Input | Function |
+|-------|----------|
+| `s` | Cycle sort mode (name / size / date) |
 
 #### Selection
 | Input | Function |
@@ -108,7 +124,7 @@ A corporate-grade terminal file navigator built in Rust with [ratatui](https://r
 | `i` | Cycle right panel (info / preview / hidden) |
 | `[` | Contract sidebar |
 | `]` | Expand sidebar |
-| `t` | Open display profile selector |
+| `t` | Open display profile / symbol set selector |
 | `` ` `` | Toggle telemetry readout |
 | `.` | Toggle hidden assets |
 

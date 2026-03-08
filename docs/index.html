@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en" class="theme-green">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>REM -- Weyland-Yutani File Navigation Terminal</title>
+  <meta name="description" content="Remote Entry Module: Corporate-grade terminal file navigator. Weyland-Yutani Corp. Standard-Issue Equipment.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    /* ═══════════════════════════════════════════════════════════
+       PALETTE SYSTEM — mapped from src/palette.rs
+       ═══════════════════════════════════════════════════════════ */
+    :root, .theme-green {
+      --bg: rgb(3, 3, 3);
+      --surface: rgb(2, 12, 2);
+      --text-dim: rgb(0, 82, 24);
+      --text-mid: rgb(0, 168, 40);
+      --text-hot: rgb(0, 255, 65);
+      --border-dim: rgb(0, 26, 8);
+      --border-mid: rgb(0, 61, 16);
+      --border-hot: rgb(0, 122, 34);
+      --warn: rgb(255, 68, 68);
+      --glow: rgba(0, 255, 65, 0.12);
+      --glow-strong: rgba(0, 255, 65, 0.35);
+    }
+    .theme-amber {
+      --bg: rgb(12, 8, 0);
+      --surface: rgb(17, 10, 0);
+      --text-dim: rgb(90, 58, 0);
+      --text-mid: rgb(196, 122, 0);
+      --text-hot: rgb(255, 176, 0);
+      --border-dim: rgb(58, 40, 0);
+      --border-mid: rgb(107, 74, 0);
+      --border-hot: rgb(128, 88, 0);
+      --warn: rgb(255, 68, 68);
+      --glow: rgba(255, 176, 0, 0.12);
+      --glow-strong: rgba(255, 176, 0, 0.35);
+    }
+    .theme-cyan {
+      --bg: rgb(1, 10, 13);
+      --surface: rgb(1, 13, 16);
+      --text-dim: rgb(0, 96, 112);
+      --text-mid: rgb(0, 149, 168);
+      --text-hot: rgb(0, 229, 255);
+      --border-dim: rgb(0, 21, 32);
+      --border-mid: rgb(0, 48, 64);
+      --border-hot: rgb(0, 96, 122);
+      --warn: rgb(255, 68, 68);
+      --glow: rgba(0, 229, 255, 0.12);
+      --glow-strong: rgba(0, 229, 255, 0.35);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       BASE
+       ═══════════════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      scroll-behavior: smooth;
+      scrollbar-color: var(--border-mid) var(--bg);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text-mid);
+      font-family: 'IBM Plex Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 14px;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* CRT scanline overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 2px,
+        rgba(0, 0, 0, 0.12) 2px,
+        rgba(0, 0, 0, 0.12) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* CRT vignette */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: radial-gradient(
+        ellipse at center,
+        transparent 55%,
+        rgba(0, 0, 0, 0.45) 100%
+      );
+      pointer-events: none;
+      z-index: 9998;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       LAYOUT
+       ═══════════════════════════════════════════════════════════ */
+    main {
+      max-width: 80ch;
+      margin: 0 auto;
+      padding: 0 1.5rem 4rem;
+    }
+
+    section {
+      margin-bottom: 3rem;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    section.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       HEADER BAR (sticky)
+       ═══════════════════════════════════════════════════════════ */
+    #header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border-mid);
+      padding: 0.4rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    #header .badge {
+      color: var(--text-hot);
+      font-weight: 700;
+      text-shadow: 0 0 8px var(--glow-strong), 0 0 20px var(--glow);
+    }
+    #header .sep { color: var(--text-dim); }
+    #header .dim { color: var(--text-dim); }
+    #header .heartbeat {
+      margin-left: auto;
+      color: var(--text-hot);
+      font-size: 16px;
+      min-width: 1ch;
+      text-align: center;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       TYPOGRAPHY
+       ═══════════════════════════════════════════════════════════ */
+    .section-title {
+      color: var(--text-dim);
+      letter-spacing: 0.35em;
+      font-size: 12px;
+      text-transform: uppercase;
+      margin-bottom: 1.2rem;
+      border-bottom: 1px solid var(--border-dim);
+      padding-bottom: 0.4rem;
+    }
+
+    .glow {
+      text-shadow: 0 0 5px var(--glow-strong), 0 0 18px var(--glow);
+    }
+
+    a {
+      color: var(--text-hot);
+      text-decoration: none;
+      transition: text-shadow 0.2s;
+    }
+    a:hover {
+      text-shadow: 0 0 6px var(--glow-strong), 0 0 16px var(--glow);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       CURSOR BLINK
+       ═══════════════════════════════════════════════════════════ */
+    .cursor {
+      animation: blink 1.1s step-end infinite;
+      color: var(--text-hot);
+    }
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      50.1%, 100% { opacity: 0; }
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       HERO / LOGO
+       ═══════════════════════════════════════════════════════════ */
+    #hero {
+      text-align: center;
+      padding-top: 2.5rem;
+    }
+    .logo-art {
+      font-size: 10px;
+      line-height: 1.15;
+      display: inline-block;
+      text-align: left;
+      overflow-x: auto;
+      max-width: 100%;
+    }
+    .logo-art .fill { color: var(--text-hot); }
+    .logo-art .gap { color: var(--border-dim); }
+
+    .corp-name {
+      color: var(--text-mid);
+      letter-spacing: 0.25em;
+      font-size: 13px;
+      margin-top: 0.8rem;
+    }
+    .corp-tag {
+      color: var(--text-dim);
+      font-size: 12px;
+      margin-top: 0.2rem;
+    }
+    .hero-rule {
+      color: var(--border-mid);
+      margin: 1rem auto;
+      max-width: 38ch;
+      overflow: hidden;
+    }
+    .product-name {
+      color: var(--text-hot);
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-shadow: 0 0 10px var(--glow-strong), 0 0 30px var(--glow);
+    }
+    .product-sub {
+      color: var(--text-mid);
+      font-size: 13px;
+      margin-top: 0.3rem;
+    }
+    .classification {
+      color: var(--text-dim);
+      font-size: 11px;
+      font-style: italic;
+      margin-top: 0.6rem;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       FEATURE LIST
+       ═══════════════════════════════════════════════════════════ */
+    .feature-list {
+      list-style: none;
+      padding: 0;
+    }
+    .feature-list li {
+      padding: 0.35rem 0;
+      border-bottom: 1px solid var(--border-dim);
+      display: flex;
+      gap: 1rem;
+      align-items: baseline;
+    }
+    .feature-list li:last-child { border-bottom: none; }
+    .feature-label {
+      color: var(--text-hot);
+      font-weight: 700;
+      min-width: 18ch;
+      flex-shrink: 0;
+      font-size: 13px;
+    }
+    .feature-desc {
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+    .feature-sigil {
+      color: var(--border-hot);
+      flex-shrink: 0;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       DISPLAY PROFILES
+       ═══════════════════════════════════════════════════════════ */
+    .profile-switcher {
+      display: flex;
+      gap: 0;
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border-dim);
+    }
+    .profile-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      border-right: 1px solid var(--border-dim);
+      color: var(--text-dim);
+      font-family: inherit;
+      font-size: 12px;
+      padding: 0.5rem;
+      cursor: pointer;
+      letter-spacing: 0.1em;
+      transition: background 0.2s, color 0.2s;
+    }
+    .profile-btn:last-child { border-right: none; }
+    .profile-btn:hover {
+      background: var(--surface);
+      color: var(--text-mid);
+    }
+    .profile-btn.active {
+      background: var(--surface);
+      color: var(--text-hot);
+      text-shadow: 0 0 6px var(--glow-strong);
+    }
+
+    .profile-cards {
+      display: grid;
+      gap: 1.5rem;
+    }
+    .profile-card {
+      border: 1px solid var(--border-dim);
+      padding: 1rem;
+      transition: border-color 0.3s;
+    }
+    .profile-card:hover {
+      border-color: var(--border-hot);
+    }
+    .profile-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 0.3rem;
+    }
+    .profile-card-name {
+      color: var(--text-hot);
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .profile-card-code {
+      color: var(--text-dim);
+      font-size: 11px;
+    }
+    .profile-card-desc {
+      color: var(--text-dim);
+      font-size: 12px;
+      margin-bottom: 0.8rem;
+    }
+    .profile-card img {
+      width: 100%;
+      border: 1px solid var(--border-dim);
+      display: block;
+    }
+
+    .boot-demo {
+      margin-top: 1.5rem;
+      text-align: center;
+    }
+    .boot-demo img {
+      max-width: 100%;
+      border: 1px solid var(--border-dim);
+    }
+    .boot-demo-label {
+      color: var(--text-dim);
+      font-size: 11px;
+      margin-top: 0.4rem;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       COMMAND TABLES
+       ═══════════════════════════════════════════════════════════ */
+    .cmd-group-title {
+      color: var(--text-mid);
+      font-size: 12px;
+      margin: 1.5rem 0 0.5rem;
+      letter-spacing: 0.1em;
+    }
+    .cmd-group-title:first-child { margin-top: 0; }
+
+    .cmd-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .cmd-table td {
+      padding: 0.25rem 0;
+      border-bottom: 1px solid var(--border-dim);
+      vertical-align: top;
+    }
+    .cmd-table tr:last-child td { border-bottom: none; }
+    .cmd-key {
+      color: var(--text-hot);
+      font-weight: 700;
+      width: 16ch;
+      white-space: nowrap;
+    }
+    .cmd-desc {
+      color: var(--text-dim);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       CODE BLOCKS
+       ═══════════════════════════════════════════════════════════ */
+    .code-block {
+      background: var(--surface);
+      border: 1px solid var(--border-dim);
+      padding: 0.8rem 1rem;
+      overflow-x: auto;
+      font-size: 13px;
+      margin: 0.5rem 0;
+    }
+    .code-block .prompt { color: var(--text-dim); }
+    .code-block .cmd { color: var(--text-hot); }
+    .code-block .comment { color: var(--text-dim); }
+
+    /* ═══════════════════════════════════════════════════════════
+       REQUIREMENTS LIST
+       ═══════════════════════════════════════════════════════════ */
+    .req-list {
+      list-style: none;
+      padding: 0;
+    }
+    .req-list li {
+      padding: 0.25rem 0;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+    .req-list li::before {
+      content: '\25b8  ';
+      color: var(--border-hot);
+    }
+    .req-list strong {
+      color: var(--text-mid);
+      font-weight: 400;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       CONFIG SECTION
+       ═══════════════════════════════════════════════════════════ */
+    .config-path {
+      color: var(--text-hot);
+      font-size: 13px;
+      margin-bottom: 0.6rem;
+    }
+    .config-block {
+      background: var(--surface);
+      border: 1px solid var(--border-dim);
+      padding: 0.8rem 1rem;
+      font-size: 13px;
+      overflow-x: auto;
+    }
+    .config-key { color: var(--text-mid); }
+    .config-val { color: var(--text-hot); }
+    .config-comment { color: var(--text-dim); }
+
+    /* ═══════════════════════════════════════════════════════════
+       SYMBOL SETS
+       ═══════════════════════════════════════════════════════════ */
+    .symbol-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(28ch, 1fr));
+      gap: 0.8rem;
+    }
+    .symbol-card {
+      border: 1px solid var(--border-dim);
+      padding: 0.6rem 0.8rem;
+      transition: border-color 0.2s;
+    }
+    .symbol-card:hover { border-color: var(--border-mid); }
+    .symbol-card-name {
+      color: var(--text-hot);
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .symbol-card-desc {
+      color: var(--text-dim);
+      font-size: 11px;
+      margin-bottom: 0.3rem;
+    }
+    .symbol-card-preview {
+      color: var(--text-mid);
+      font-size: 14px;
+      letter-spacing: 0.3em;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       FOOTER
+       ═══════════════════════════════════════════════════════════ */
+    footer {
+      max-width: 80ch;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 3rem;
+      text-align: center;
+      font-size: 12px;
+    }
+    footer .rule {
+      color: var(--border-mid);
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+    footer .corp-line {
+      color: var(--text-mid);
+      margin-bottom: 0.3rem;
+    }
+    footer .legal {
+      color: var(--text-dim);
+      font-size: 11px;
+      margin-top: 0.5rem;
+      line-height: 1.5;
+    }
+    footer .terminated {
+      color: var(--text-dim);
+      margin-top: 1rem;
+      letter-spacing: 0.2em;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       BOOT SEQUENCE OVERLAY
+       ═══════════════════════════════════════════════════════════ */
+    #boot {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      background: var(--bg);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 8vh;
+      transition: opacity 0.6s ease;
+      cursor: pointer;
+    }
+    #boot.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #boot-text {
+      font-family: inherit;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text-mid);
+      white-space: pre;
+      max-width: 84ch;
+      overflow: hidden;
+    }
+    #boot-text .hot { color: var(--text-hot); font-weight: 700; }
+    #boot-text .dim { color: var(--text-dim); }
+    #boot-text .mid { color: var(--text-mid); }
+    #boot-text .rule { color: var(--border-mid); }
+    #boot-text .bold-hot {
+      color: var(--text-hot);
+      font-weight: 700;
+      text-shadow: 0 0 8px var(--glow-strong);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       RESPONSIVE
+       ═══════════════════════════════════════════════════════════ */
+    @media (max-width: 600px) {
+      body { font-size: 12px; }
+      main { padding: 0 1rem 3rem; }
+      #header { padding: 0.4rem 1rem; font-size: 11px; }
+      .logo-art { font-size: 7px; }
+      .feature-list li { flex-direction: column; gap: 0.2rem; }
+      .feature-label { min-width: auto; }
+      .profile-switcher { flex-direction: column; }
+      .profile-btn { border-right: none; border-bottom: 1px solid var(--border-dim); }
+      .profile-btn:last-child { border-bottom: none; }
+      .symbol-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       BOOT SEQUENCE OVERLAY
+       ═══════════════════════════════════════════════════════════ -->
+  <div id="boot">
+    <pre id="boot-text"></pre>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       HEADER BAR
+       ═══════════════════════════════════════════════════════════ -->
+  <header id="header">
+    <span class="badge">&#x25c6; WEYLAND-YUTANI CORP</span>
+    <span class="sep">&middot;</span>
+    <span>REM DOCUMENTATION TERMINAL</span>
+    <span class="sep">&middot;</span>
+    <span class="dim">WY-DOC-4789</span>
+    <span id="heartbeat" class="heartbeat"></span>
+  </header>
+
+  <main>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         HERO
+         ═══════════════════════════════════════════════════════════ -->
+    <section id="hero">
+      <div class="logo-art" aria-label="Weyland-Yutani corporate logo"><span class="fill">@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@</span>
+<span class="fill">@@@@@</span><span class="gap">...........</span><span class="fill">@@@@</span><span class="gap">...........</span><span class="fill">@@@@</span><span class="gap">..........</span><span class="fill">@@@@</span><span class="gap">...........</span><span class="fill">@@@@</span><span class="gap">...........</span><span class="fill">@@@@@</span>
+<span class="fill">@@@@@@@</span><span class="gap">...........</span><span class="fill">@@@@</span><span class="gap">.......</span><span class="fill">@@@@</span><span class="gap">..............</span><span class="fill">@@@@</span><span class="gap">.......</span><span class="fill">@@@@</span><span class="gap">...........</span><span class="fill">@@@@@@@</span>
+<span class="fill">@@@@@@@@@</span><span class="gap">...........</span><span class="fill">@@@@</span><span class="gap">...</span><span class="fill">@@@@</span><span class="gap">..................</span><span class="fill">@@@@</span><span class="gap">...</span><span class="fill">@@@@</span><span class="gap">...........</span><span class="fill">@@@@@@@@@</span>
+<span class="fill">@@@@@@@@@@@</span><span class="gap">...........</span><span class="fill">@@@@@@</span><span class="gap">........................</span><span class="fill">@@@@@@</span><span class="gap">...........</span><span class="fill">@@@@@@@@@@@</span>
+<span class="fill">@@@@@@@@@@@@@</span><span class="gap">...........</span><span class="fill">@@</span><span class="gap">.............</span><span class="fill">@@</span><span class="gap">.............</span><span class="fill">@@</span><span class="gap">...........</span><span class="fill">@@@@@@@@@@@@@</span>
+<span class="fill">@@@@@@@@@@@@@@</span><span class="gap">.......................</span><span class="fill">@@</span><span class="gap">..</span><span class="fill">@@</span><span class="gap">.......................</span><span class="fill">@@@@@@@@@@@@@@</span>
+<span class="fill">@@@@@@@@@@@@@@@@@</span><span class="gap">..................</span><span class="fill">@@</span><span class="gap">......</span><span class="fill">@@</span><span class="gap">..................</span><span class="fill">@@@@@@@@@@@@@@@@@</span>
+<span class="fill">@@@@@@@@@@@@@@@@@@</span><span class="gap">..............</span><span class="fill">@@@</span><span class="gap">..........</span><span class="fill">@@@</span><span class="gap">..............</span><span class="fill">@@@@@@@@@@@@@@@@@@</span>
+<span class="fill">@@@@@@@@@@@@@@@@@@@@@</span><span class="gap">..........</span><span class="fill">@@@@</span><span class="gap">..........</span><span class="fill">@@@@</span><span class="gap">..........</span><span class="fill">@@@@@@@@@@@@@@@@@@@@@</span>
+<span class="fill">@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@</span></div>
+
+      <div class="corp-name">W E Y L A N D &#x2500; Y U T A N I</div>
+      <div class="corp-tag">BUILDING BETTER WORLDS</div>
+      <div class="hero-rule">&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;</div>
+      <div class="product-name glow">REMOTE ENTRY MODULE</div>
+      <div class="product-sub">Standard-Issue File Navigation Terminal</div>
+      <div class="classification">Classified under WY-DOC-4789. Unauthorized access is a violation of ICC corporate law.</div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         TERMINAL CAPABILITIES
+         ═══════════════════════════════════════════════════════════ -->
+    <section id="capabilities">
+      <div class="section-title">T E R M I N A L &nbsp; C A P A B I L I T I E S</div>
+      <ul class="feature-list">
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">NAVIGATION</span><span class="feature-desc">Vim-keyed traversal, jump-to-top/bottom, smooth animated transitions</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">DUAL-PANE OPS</span><span class="feature-desc">Tab to deploy split-view for cross-directory transfers</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">VISUAL TARGETING</span><span class="feature-desc">v to enter selection mode, mark multiple assets with j/k</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">ASSET MANAGEMENT</span><span class="feature-desc">yy copy, dd cut, p paste, D purge (requires confirmation)</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">BULK RENAME</span><span class="feature-desc">R in visual mode for find/replace pattern renaming across selections</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">FUZZY SEARCH</span><span class="feature-desc">/ to locate assets in the current directory via pattern matching</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">RECURSIVE SEARCH</span><span class="feature-desc">S to search across all subdirectories</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">JUMP KEYS</span><span class="feature-desc">f to display single-key target labels on all visible entries</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">NAVIGATION MARKS</span><span class="feature-desc">m + key to designate a waypoint, ' + key to return</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">ASSET PREVIEW</span><span class="feature-desc">Side panel with syntax-highlighted, scrollable file contents</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">IN-APP EDITOR</span><span class="feature-desc">e to edit files with syntax highlighting, undo stack, and save</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">SORT MODES</span><span class="feature-desc">s to cycle between name, size, and date ordering</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">GIT INTEGRATION</span><span class="feature-desc">Current branch and dirty status displayed in header</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">NERD FONT ICONS</span><span class="feature-desc">Extension-based file icons with fallback for standard terminals</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">SYMBOL SETS</span><span class="feature-desc">7 swappable glyph styles via theme picker</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">SYSTEM TELEMETRY</span><span class="feature-desc">` to monitor CPU, RAM, disk, and network diagnostics</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">DISPLAY PROFILES</span><span class="feature-desc">t to open the theme and symbol set selector</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">BOOT SEQUENCE</span><span class="feature-desc">Corporate authentication splash with animated WY mark</span></li>
+      </ul>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         DISPLAY PROFILES
+         ═══════════════════════════════════════════════════════════ -->
+    <section id="profiles">
+      <div class="section-title">D I S P L A Y &nbsp; P R O F I L E S</div>
+
+      <div class="profile-switcher">
+        <button class="profile-btn active" data-theme="green" onclick="setTheme('green')">PHOSPHOR GREEN</button>
+        <button class="profile-btn" data-theme="amber" onclick="setTheme('amber')">AMBER</button>
+        <button class="profile-btn" data-theme="cyan" onclick="setTheme('cyan')">DEGRADED CYAN</button>
+      </div>
+
+      <div class="profile-cards">
+        <div class="profile-card">
+          <div class="profile-card-header">
+            <span class="profile-card-name">PHOSPHOR GREEN</span>
+            <span class="profile-card-code">WY-CRT-01</span>
+          </div>
+          <div class="profile-card-desc">Standard colony terminals</div>
+          <img src="screenshots/green.png" alt="Phosphor Green display profile" loading="lazy">
+        </div>
+        <div class="profile-card">
+          <div class="profile-card-header">
+            <span class="profile-card-name">AMBER</span>
+            <span class="profile-card-code">WY-CRT-02</span>
+          </div>
+          <div class="profile-card-desc">Corporate mainframe consoles</div>
+          <img src="screenshots/amber.png" alt="Amber display profile" loading="lazy">
+        </div>
+        <div class="profile-card">
+          <div class="profile-card-header">
+            <span class="profile-card-name">DEGRADED CYAN</span>
+            <span class="profile-card-code">WY-CRT-03</span>
+          </div>
+          <div class="profile-card-desc">Field units, survey equipment</div>
+          <img src="screenshots/cyan-w-theme-picker.png" alt="Degraded Cyan display profile with theme picker" loading="lazy">
+        </div>
+      </div>
+
+      <div class="boot-demo">
+        <div class="profile-card-desc" style="margin-bottom: 0.5rem;">BOOT SEQUENCE DEMONSTRATION</div>
+        <img src="screenshots/boot-amber.gif" alt="Boot sequence animation" loading="lazy">
+        <div class="boot-demo-label">WY-CRT-02 AMBER PROFILE &middot; BOOT AUTHENTICATION SEQUENCE</div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SYMBOL SETS
+         ═══════════════════════════════════════════════════════════ -->
+    <section id="symbols">
+      <div class="section-title">S Y M B O L &nbsp; S E T S</div>
+      <div class="symbol-grid">
+        <div class="symbol-card">
+          <div class="symbol-card-name">STANDARD</div>
+          <div class="symbol-card-desc">Nerd Font glyphs</div>
+          <div class="symbol-card-preview">&#x25b6; &#x25c6; &#x2713; &#x2588;&#x2591; &#x2192;</div>
+        </div>
+        <div class="symbol-card">
+          <div class="symbol-card-name">ASCII</div>
+          <div class="symbol-card-desc">Pure ASCII compat</div>
+          <div class="symbol-card-preview">&gt; * ok #- -&gt;</div>
+        </div>
+        <div class="symbol-card">
+          <div class="symbol-card-name">BLOCK</div>
+          <div class="symbol-card-desc">Heavy geometric</div>
+          <div class="symbol-card-preview">&#x2588;&#x25b6; &#x2588; &#x2588; &#x2588;&#x2592; &#x25b6;</div>
+        </div>
+        <div class="symbol-card">
+          <div class="symbol-card-name">MINIMAL</div>
+          <div class="symbol-card-desc">Clean, sparse</div>
+          <div class="symbol-card-preview">&#x203a; &#x2022; &#x2022; &#x25cf;&#xb7; &#x203a;</div>
+        </div>
+        <div class="symbol-card">
+          <div class="symbol-card-name">PIPELINE</div>
+          <div class="symbol-card-desc">Industrial pipes</div>
+          <div class="symbol-card-preview">&#x25b7; &#x25c8; &#x25c6; &#x2588;&#x2591; &#x25b7;</div>
+        </div>
+        <div class="symbol-card">
+          <div class="symbol-card-name">BRAILLE</div>
+          <div class="symbol-card-desc">Dot patterns</div>
+          <div class="symbol-card-preview">&#x28ff; &#x2836; &#x28ff; &#x28ff;&#x2840; &#x2836;</div>
+        </div>
+        <div class="symbol-card">
+          <div class="symbol-card-name">SCANLINE</div>
+          <div class="symbol-card-desc">CRT interlaced</div>
+          <div class="symbol-card-preview">&#x25b8; &#x25c9; &#x25c9; &#x25ae;&#x25af; &#x25b8;</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         COMMAND REFERENCE
+         ═══════════════════════════════════════════════════════════ -->
+    <section id="commands">
+      <div class="section-title">C O M M A N D &nbsp; R E F E R E N C E</div>
+
+      <div class="cmd-group-title">NAVIGATION</div>
+      <table class="cmd-table">
+        <tr><td class="cmd-key">h / Left</td><td class="cmd-desc">Ascend to parent directory</td></tr>
+        <tr><td class="cmd-key">l / Right / Enter</td><td class="cmd-desc">Enter directory</td></tr>
+        <tr><td class="cmd-key">j / Down</td><td class="cmd-desc">Cursor down</td></tr>
+        <tr><td class="cmd-key">k / Up</td><td class="cmd-desc">Cursor up</td></tr>
+        <tr><td class="cmd-key">gg</td><td class="cmd-desc">Jump to first entry</td></tr>
+        <tr><td class="cmd-key">G</td><td class="cmd-desc">Jump to last entry</td></tr>
+        <tr><td class="cmd-key">H</td><td class="cmd-desc">Navigate back in history</td></tr>
+        <tr><td class="cmd-key">L</td><td class="cmd-desc">Navigate forward in history</td></tr>
+        <tr><td class="cmd-key">-</td><td class="cmd-desc">Ascend to parent directory</td></tr>
+      </table>
+
+      <div class="cmd-group-title">SEARCH &amp; TARGETING</div>
+      <table class="cmd-table">
+        <tr><td class="cmd-key">/</td><td class="cmd-desc">Fuzzy search current directory</td></tr>
+        <tr><td class="cmd-key">S</td><td class="cmd-desc">Recursive search across subdirectories</td></tr>
+        <tr><td class="cmd-key">f</td><td class="cmd-desc">Deploy jump key overlay</td></tr>
+        <tr><td class="cmd-key">m + key</td><td class="cmd-desc">Set navigation mark</td></tr>
+        <tr><td class="cmd-key">' + key</td><td class="cmd-desc">Jump to navigation mark</td></tr>
+      </table>
+
+      <div class="cmd-group-title">ASSET OPERATIONS</div>
+      <table class="cmd-table">
+        <tr><td class="cmd-key">yy</td><td class="cmd-desc">Copy current asset or selection</td></tr>
+        <tr><td class="cmd-key">dd</td><td class="cmd-desc">Cut current asset or selection</td></tr>
+        <tr><td class="cmd-key">p</td><td class="cmd-desc">Paste from operations buffer</td></tr>
+        <tr><td class="cmd-key">D</td><td class="cmd-desc">Purge selection (confirmation required)</td></tr>
+        <tr><td class="cmd-key">r</td><td class="cmd-desc">Rename asset</td></tr>
+        <tr><td class="cmd-key">R</td><td class="cmd-desc">Bulk rename (visual mode -- find/replace)</td></tr>
+        <tr><td class="cmd-key">a</td><td class="cmd-desc">Provision new file</td></tr>
+        <tr><td class="cmd-key">A</td><td class="cmd-desc">Provision new directory</td></tr>
+        <tr><td class="cmd-key">e</td><td class="cmd-desc">Open in-app text editor</td></tr>
+        <tr><td class="cmd-key">E</td><td class="cmd-desc">Open in external $EDITOR</td></tr>
+      </table>
+
+      <div class="cmd-group-title">SORTING</div>
+      <table class="cmd-table">
+        <tr><td class="cmd-key">s</td><td class="cmd-desc">Cycle sort mode (name / size / date)</td></tr>
+      </table>
+
+      <div class="cmd-group-title">SELECTION</div>
+      <table class="cmd-table">
+        <tr><td class="cmd-key">v</td><td class="cmd-desc">Toggle visual targeting mode</td></tr>
+        <tr><td class="cmd-key">u</td><td class="cmd-desc">Clear all marks</td></tr>
+      </table>
+
+      <div class="cmd-group-title">DISPLAY &amp; PANELS</div>
+      <table class="cmd-table">
+        <tr><td class="cmd-key">Tab</td><td class="cmd-desc">Toggle dual-pane / switch active pane</td></tr>
+        <tr><td class="cmd-key">i</td><td class="cmd-desc">Cycle right panel (info / preview / hidden)</td></tr>
+        <tr><td class="cmd-key">[</td><td class="cmd-desc">Contract sidebar</td></tr>
+        <tr><td class="cmd-key">]</td><td class="cmd-desc">Expand sidebar</td></tr>
+        <tr><td class="cmd-key">t</td><td class="cmd-desc">Open display profile / symbol set selector</td></tr>
+        <tr><td class="cmd-key">`</td><td class="cmd-desc">Toggle telemetry readout</td></tr>
+        <tr><td class="cmd-key">.</td><td class="cmd-desc">Toggle hidden assets</td></tr>
+      </table>
+
+      <div class="cmd-group-title">GENERAL</div>
+      <table class="cmd-table">
+        <tr><td class="cmd-key">q</td><td class="cmd-desc">Terminate session</td></tr>
+        <tr><td class="cmd-key">Esc</td><td class="cmd-desc">Abort current operation</td></tr>
+      </table>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         CONFIGURATION
+         ═══════════════════════════════════════════════════════════ -->
+    <section id="configuration">
+      <div class="section-title">C O N F I G U R A T I O N</div>
+      <div class="config-path">~/.config/rem/config.toml</div>
+      <div class="config-block"><span class="config-comment"># Display settings</span>
+<span class="config-key">[appearance]</span>
+<span class="config-key">palette</span> = <span class="config-val">"green"</span>       <span class="config-comment"># green | amber | cyan</span>
+<span class="config-key">symbols</span> = <span class="config-val">"standard"</span>    <span class="config-comment"># standard | ascii | block | minimal | pipeline | braille | scanline</span>
+
+<span class="config-comment"># Behavior</span>
+<span class="config-key">[behavior]</span>
+<span class="config-key">show_hidden</span> = <span class="config-val">false</span>
+<span class="config-key">default_panel</span> = <span class="config-val">"info"</span>   <span class="config-comment"># info | preview | hidden</span>
+<span class="config-key">boot_sequence</span> = <span class="config-val">true</span></div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         DEPLOYMENT
+         ═══════════════════════════════════════════════════════════ -->
+    <section id="deployment">
+      <div class="section-title">D E P L O Y M E N T</div>
+
+      <div class="cmd-group-title">QUICK INSTALL</div>
+      <div class="code-block"><span class="prompt">$ </span><span class="cmd">cargo install --path .</span></div>
+
+      <div class="cmd-group-title">BUILD FROM SOURCE</div>
+      <div class="code-block"><span class="prompt">$ </span><span class="cmd">git clone https://github.com/johnsideserf/rem.git</span>
+<span class="prompt">$ </span><span class="cmd">cd rem</span>
+<span class="prompt">$ </span><span class="cmd">cargo build --release</span>
+<span class="prompt">$ </span><span class="cmd">./target/release/rem</span></div>
+
+      <div class="cmd-group-title">CLI FLAGS</div>
+      <div class="code-block"><span class="prompt">$ </span><span class="cmd">rem</span>              <span class="comment"># default phosphor green profile</span>
+<span class="prompt">$ </span><span class="cmd">rem --amber</span>      <span class="comment"># amber profile</span>
+<span class="prompt">$ </span><span class="cmd">rem --cyan</span>       <span class="comment"># degraded cyan profile</span>
+<span class="prompt">$ </span><span class="cmd">rem --no-boot</span>    <span class="comment"># skip boot sequence</span></div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SYSTEM REQUIREMENTS
+         ═══════════════════════════════════════════════════════════ -->
+    <section id="requirements">
+      <div class="section-title">S Y S T E M &nbsp; R E Q U I R E M E N T S</div>
+      <ul class="req-list">
+        <li><strong>Rust 2024 edition</strong> (1.85+)</li>
+        <li><strong>Terminal</strong> with Unicode rendering capability</li>
+        <li><strong>Nerd Font</strong> recommended for optimal glyph display (fallback available via ASCII symbol set)</li>
+        <li><strong>Minimum width:</strong> 80 columns (100+ for dual-pane and sidebar)</li>
+      </ul>
+    </section>
+
+  </main>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       FOOTER
+       ═══════════════════════════════════════════════════════════ -->
+  <footer>
+    <div class="rule">&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;</div>
+    <div class="corp-line">Weyland-Yutani Corporation. Building Better Worlds.</div>
+    <div class="legal">This software is provided under the MIT license.<br>The Company assumes no liability for data loss, xenomorph encounters,<br>or crew expenditure resulting from use of this terminal.</div>
+    <div class="terminated">SESSION TERMINATED <span class="cursor">&#x258b;</span></div>
+  </footer>
+
+  <script>
+    /* ═══════════════════════════════════════════════════════════
+       THEME SWITCHER
+       ═══════════════════════════════════════════════════════════ */
+    function setTheme(name) {
+      document.documentElement.className = 'theme-' + name;
+      localStorage.setItem('wy-theme', name);
+      document.querySelectorAll('.profile-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.theme === name);
+      });
+    }
+
+    (function() {
+      var saved = localStorage.getItem('wy-theme');
+      if (saved) setTheme(saved);
+    })();
+
+    /* ═══════════════════════════════════════════════════════════
+       HEARTBEAT THROBBER
+       ═══════════════════════════════════════════════════════════ */
+    (function() {
+      var frames = ['\u00b7', '\u2219', '\u2022', '\u25cf', '\u2022', '\u2219', '\u00b7'];
+      var idx = 0;
+      var el = document.getElementById('heartbeat');
+      setInterval(function() {
+        el.textContent = frames[idx];
+        idx = (idx + 1) % frames.length;
+      }, 300);
+    })();
+
+    /* ═══════════════════════════════════════════════════════════
+       SCROLL-TRIGGERED SECTION REVEAL
+       ═══════════════════════════════════════════════════════════ */
+    (function() {
+      var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+          }
+        });
+      }, { threshold: 0.08 });
+
+      document.querySelectorAll('section').forEach(function(s) {
+        observer.observe(s);
+      });
+    })();
+
+    /* ═══════════════════════════════════════════════════════════
+       BOOT SEQUENCE
+       ═══════════════════════════════════════════════════════════ */
+    (function() {
+      var bootEl = document.getElementById('boot');
+      var textEl = document.getElementById('boot-text');
+
+      // Skip if already seen this session
+      if (sessionStorage.getItem('wy-boot-done')) {
+        bootEl.style.display = 'none';
+        return;
+      }
+
+      var skipped = false;
+
+      function skip() {
+        if (skipped) return;
+        skipped = true;
+        sessionStorage.setItem('wy-boot-done', '1');
+        bootEl.classList.add('fade-out');
+        setTimeout(function() { bootEl.style.display = 'none'; }, 600);
+      }
+
+      bootEl.addEventListener('click', skip);
+      document.addEventListener('keydown', function handler(e) {
+        skip();
+        document.removeEventListener('keydown', handler);
+      });
+
+      // Logo art
+      var logo = [
+        '@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@',
+        '@@@@@...........@@@@...........@@@@..........@@@@...........@@@@...........@@@@@',
+        '@@@@@@@...........@@@@.......@@@@..............@@@@.......@@@@...........@@@@@@@',
+        '@@@@@@@@@...........@@@@...@@@@..................@@@@...@@@@...........@@@@@@@@@',
+        '@@@@@@@@@@@...........@@@@@@........................@@@@@@...........@@@@@@@@@@@',
+        '@@@@@@@@@@@@@...........@@.............@@.............@@...........@@@@@@@@@@@@@',
+        '@@@@@@@@@@@@@@.......................@@..@@.......................@@@@@@@@@@@@@@',
+        '@@@@@@@@@@@@@@@@@..................@@......@@..................@@@@@@@@@@@@@@@@@',
+        '@@@@@@@@@@@@@@@@@@..............@@@..........@@@..............@@@@@@@@@@@@@@@@@@',
+        '@@@@@@@@@@@@@@@@@@@@@..........@@@@..........@@@@..........@@@@@@@@@@@@@@@@@@@@@',
+        '@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@'
+      ];
+
+      var corpName = 'W E Y L A N D \u2500 Y U T A N I';
+      var corpTag  = 'BUILDING BETTER WORLDS';
+      var rule     = '\u2501'.repeat(38);
+
+      var bootLines = [
+        { label: 'BIOS',      dots: ' .............. ', value: 'OK' },
+        { label: 'MEMORY',    dots: ' ............ ',   value: '640K' },
+        { label: 'DISK',      dots: ' .............. ', value: 'OK', throbber: true },
+        { label: 'INTERFACE', dots: ' ......... ',      value: 'NOMINAL' }
+      ];
+
+      var throbberFrames = ['\u2801', '\u2809', '\u2819', '\u2818', '\u2838', '\u2834', '\u2826', '\u2827', '\u2807', '\u280f'];
+      var throbberIdx = 0;
+
+      // Build the sequence as a list of steps
+      var steps = [];
+      var delay = 0;
+
+      // Logo lines (80ms each)
+      logo.forEach(function(line) {
+        steps.push({ delay: delay, action: 'logo', text: line });
+        delay += 80;
+      });
+
+      // Blank + corp name + tag + rule
+      steps.push({ delay: delay, action: 'text', text: '', cls: '' });
+      delay += 80;
+      steps.push({ delay: delay, action: 'text', text: '  ' + corpName, cls: 'mid' });
+      delay += 80;
+      steps.push({ delay: delay, action: 'text', text: '  ' + corpTag, cls: 'dim' });
+      delay += 80;
+      steps.push({ delay: delay, action: 'text', text: '  ' + rule, cls: 'rule' });
+      delay += 150;
+
+      // Blank before boot lines
+      steps.push({ delay: delay, action: 'text', text: '', cls: '' });
+      delay += 100;
+
+      // Boot check lines
+      bootLines.forEach(function(bl) {
+        steps.push({ delay: delay, action: 'boot-label', label: bl.label, dots: bl.dots });
+        delay += 100;
+        if (bl.throbber) {
+          steps.push({ delay: delay, action: 'boot-throbber', duration: 400 });
+          delay += 450;
+        }
+        steps.push({ delay: delay, action: 'boot-value', value: bl.value });
+        delay += 150;
+      });
+
+      // READY
+      steps.push({ delay: delay, action: 'text', text: '', cls: '' });
+      delay += 50;
+      steps.push({ delay: delay, action: 'text', text: '  READY.', cls: 'bold-hot' });
+      delay += 800;
+      steps.push({ delay: delay, action: 'done' });
+
+      var currentLine = null;
+      var throbberInterval = null;
+
+      function colorLogo(line) {
+        var html = '';
+        var run = '';
+        var isFill = true;
+        for (var i = 0; i < line.length; i++) {
+          var ch = line[i];
+          var chIsFill = (ch === '@');
+          if (run.length > 0 && chIsFill !== isFill) {
+            html += '<span class="' + (isFill ? 'hot' : 'dim') + '">' + escHtml(run) + '</span>';
+            run = '';
+          }
+          isFill = chIsFill;
+          run += ch;
+        }
+        if (run.length > 0) {
+          html += '<span class="' + (isFill ? 'hot' : 'dim') + '">' + escHtml(run) + '</span>';
+        }
+        return html;
+      }
+
+      function escHtml(s) {
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }
+
+      function addLine(html) {
+        var line = document.createElement('div');
+        line.innerHTML = html || '&nbsp;';
+        textEl.appendChild(line);
+        currentLine = line;
+        return line;
+      }
+
+      steps.forEach(function(step) {
+        setTimeout(function() {
+          if (skipped) return;
+          switch (step.action) {
+            case 'logo':
+              addLine(colorLogo(step.text));
+              break;
+            case 'text':
+              var html = step.cls ? '<span class="' + step.cls + '">' + escHtml(step.text) + '</span>' : (step.text ? escHtml(step.text) : '&nbsp;');
+              addLine(html);
+              break;
+            case 'boot-label':
+              addLine('<span class="mid">  ' + escHtml(step.label) + '</span><span class="dim">' + escHtml(step.dots) + '</span>');
+              break;
+            case 'boot-throbber':
+              // Animate throbber on current line
+              var targetLine = currentLine;
+              throbberInterval = setInterval(function() {
+                if (skipped) { clearInterval(throbberInterval); return; }
+                var frame = throbberFrames[throbberIdx % throbberFrames.length];
+                throbberIdx++;
+                // Replace value area
+                var spans = targetLine.querySelectorAll('span');
+                if (spans.length >= 2) {
+                  // Add throbber span if not present
+                  if (spans.length === 2) {
+                    var ts = document.createElement('span');
+                    ts.className = 'hot';
+                    targetLine.appendChild(ts);
+                    var ss = document.createElement('span');
+                    ss.className = 'dim';
+                    ss.textContent = ' SCANNING';
+                    targetLine.appendChild(ss);
+                  }
+                  spans = targetLine.querySelectorAll('span');
+                  if (spans.length >= 3) spans[2].textContent = frame;
+                }
+              }, 100);
+              break;
+            case 'boot-value':
+              if (throbberInterval) { clearInterval(throbberInterval); throbberInterval = null; }
+              // Replace current line content with resolved value
+              if (currentLine) {
+                var parts = currentLine.querySelectorAll('span');
+                var labelHtml = parts.length >= 2 ? '<span class="mid">' + parts[0].innerHTML + '</span><span class="dim">' + parts[1].innerHTML + '</span>' : '';
+                currentLine.innerHTML = labelHtml + '<span class="hot">' + escHtml(step.value) + '</span>';
+              }
+              break;
+            case 'done':
+              sessionStorage.setItem('wy-boot-done', '1');
+              setTimeout(skip, 100);
+              break;
+          }
+        }, step.delay);
+      });
+
+      // Safety timeout: dismiss after 5 seconds no matter what
+      setTimeout(skip, 5000);
+    })();
+  </script>
+</body>
+</html>
