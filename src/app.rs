@@ -122,6 +122,14 @@ impl PaneState {
     }
 }
 
+/// Request to open a file externally (handled by main loop).
+pub enum OpenRequest {
+    /// Open in $EDITOR
+    Editor(PathBuf),
+    /// Open with system default handler
+    SystemDefault(PathBuf),
+}
+
 pub struct App {
     pub panes: [PaneState; 2],
     pub active_pane: usize,
@@ -152,6 +160,7 @@ pub struct App {
     pub sidebar_pct: u16,
     pub show_theme_picker: bool,
     pub theme_picker_cursor: usize,
+    pub open_request: Option<OpenRequest>,
 }
 
 impl App {
@@ -186,6 +195,7 @@ impl App {
             sidebar_pct: 22,
             show_theme_picker: false,
             theme_picker_cursor: 0,
+            open_request: None,
         };
         app.load_entries();
         app

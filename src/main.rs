@@ -20,7 +20,7 @@ use crossterm::execute;
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 
-use app::App;
+use app::{App, OpenRequest};
 use config::Config;
 
 fn main() -> io::Result<()> {
@@ -91,9 +91,91 @@ fn run_loop(
                 if let Some(path) = app.selected_path.take() {
                     return Ok(Some(path));
                 }
+                if let Some(req) = app.open_request.take() {
+                    handle_open(terminal, app, req)?;
+                }
             }
         }
 
         app.tick();
     }
+}
+
+/// Suspend the TUI, open a file, then restore.
+fn handle_open(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    app: &mut App,
+    req: OpenRequest,
+) -> io::Result<()> {
+    let path = match &req {
+        OpenRequest::Editor(p) | OpenRequest::SystemDefault(p) => p.clone(),
+    };
+
+    let mut cmd = match &req {
+        OpenRequest::Editor(_) => {
+            let editor = std::env::var("VISUAL")
+                .or_else(|_| std::env::var("EDITOR"))
+                .unwrap_or_else(|_| {
+                    if cfg!(windows) { "notepad".to_string() }
+                    else { "vi".to_string() }
+                });
+            let mut c = std::process::Command::new(&editor);
+            c.arg(&path);
+            c
+        }
+        OpenRequest::SystemDefault(_) => {
+            if cfg!(windows) {
+                let mut c = std::process::Command::new("cmd");
+                c.args(["/C", "start", "", &path.to_string_lossy()]);
+                c
+            } else if cfg!(target_os = "macos") {
+                let mut c = std::process::Command::new("open");
+                c.arg(&path);
+                c
+            } else {
+                let mut c = std::process::Command::new("xdg-open");
+                c.arg(&path);
+                c
+            }
+        }
+    };
+
+    // For editor: suspend TUI, wait for exit, restore
+    // For system default: just spawn detached (don't suspend)
+    match &req {
+        OpenRequest::Editor(_) => {
+            // Suspend TUI
+            terminal::disable_raw_mode()?;
+            execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+
+            let result = cmd.status();
+
+            // Restore TUI
+            terminal::enable_raw_mode()?;
+            execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+            terminal.clear()?;
+
+            if let Err(e) = result {
+                app.error = Some((
+                    format!("EDITOR FAILED: {}", e),
+                    std::time::Instant::now(),
+                ));
+            }
+            // Reload entries in case the file was modified
+            app.load_entries();
+        }
+        OpenRequest::SystemDefault(_) => {
+            match cmd.spawn() {
+                Ok(_) => {}
+                Err(e) => {
+                    app.error = Some((
+                        format!("OPEN FAILED: {}", e),
+                        std::time::Instant::now(),
+                    ));
+                }
+            }
+        }
+    }
+
+    Ok(())
 }

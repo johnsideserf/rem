@@ -74,6 +74,7 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
             let mut h = vec![
                 ("hjkl", "move"),
                 ("enter", "open"),
+                ("e", "edit"),
                 ("/", "fuzzy"),
                 ("v", "select"),
                 ("yy", "copy"),

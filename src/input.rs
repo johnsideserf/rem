@@ -168,6 +168,9 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
             app.create_buf.clear();
             app.mode = Mode::Create { is_dir: true };
         }
+        (KeyModifiers::NONE, KeyCode::Char('e')) => {
+            app.edit_selected();
+        }
         (KeyModifiers::SHIFT, KeyCode::Char('H')) => {
             app.show_hidden = !app.show_hidden;
             app.rebuild_filtered();

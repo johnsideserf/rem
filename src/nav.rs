@@ -123,7 +123,15 @@ impl App {
                 let path = entry.path.clone();
                 self.navigate_to(path);
             } else {
-                self.selected_path = Some(entry.path.clone());
+                self.open_request = Some(crate::app::OpenRequest::SystemDefault(entry.path.clone()));
+            }
+        }
+    }
+
+    pub fn edit_selected(&mut self) {
+        if let Some(entry) = self.current_entry() {
+            if !entry.is_dir {
+                self.open_request = Some(crate::app::OpenRequest::Editor(entry.path.clone()));
             }
         }
     }
