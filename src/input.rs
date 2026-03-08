@@ -40,6 +40,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         Mode::WaitingForDeleteMark => handle_delete_mark(app, key),
         Mode::RecursiveSearch => handle_rsearch(app, key),
         Mode::BulkRename => handle_bulk_rename(app, key),
+        Mode::Edit => handle_edit(app, key),
     }
 }
 
@@ -181,6 +182,9 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
         }
         (KeyModifiers::NONE, KeyCode::Char('e')) => {
             app.edit_selected();
+        }
+        (KeyModifiers::SHIFT, KeyCode::Char('E')) => {
+            app.edit_external();
         }
         (KeyModifiers::NONE, KeyCode::Char('s')) => {
             app.sort_mode = app.sort_mode.next();
@@ -679,6 +683,135 @@ fn execute_bulk_rename(app: &mut App) {
     app.visual_marks.clear();
     app.mode = Mode::Normal;
     app.load_entries();
+}
+
+fn handle_edit(app: &mut App, key: KeyEvent) {
+    let Some(ed) = &mut app.editor else { return };
+
+    // Unsaved changes prompt
+    if ed.confirm_exit {
+        match key.code {
+            KeyCode::Char('y') | KeyCode::Char('Y') => {
+                app.editor = None;
+                app.mode = Mode::Normal;
+                app.load_entries();
+            }
+            _ => {
+                ed.confirm_exit = false;
+            }
+        }
+        return;
+    }
+
+    match (key.modifiers, key.code) {
+        // Exit
+        (_, KeyCode::Esc) | (KeyModifiers::CONTROL, KeyCode::Char('q')) => {
+            if ed.dirty {
+                ed.confirm_exit = true;
+            } else {
+                app.editor = None;
+                app.mode = Mode::Normal;
+                app.load_entries();
+            }
+        }
+        // Save
+        (KeyModifiers::CONTROL, KeyCode::Char('s')) => {
+            if let Err(msg) = ed.save() {
+                app.error = Some((msg, Instant::now()));
+            }
+        }
+        // Undo
+        (KeyModifiers::CONTROL, KeyCode::Char('z')) => {
+            ed.undo();
+        }
+        // Delete line
+        (KeyModifiers::CONTROL, KeyCode::Char('d')) => {
+            ed.push_undo();
+            ed.delete_line();
+        }
+        // Kill to end of line
+        (KeyModifiers::CONTROL, KeyCode::Char('k')) => {
+            ed.push_undo();
+            ed.kill_to_eol();
+        }
+        // Cursor movement
+        (_, KeyCode::Up) => {
+            if ed.cursor_row > 0 {
+                ed.cursor_row -= 1;
+                ed.clamp_cursor();
+                ed.ensure_cursor_visible();
+            }
+        }
+        (_, KeyCode::Down) => {
+            if ed.cursor_row + 1 < ed.lines.len() {
+                ed.cursor_row += 1;
+                ed.clamp_cursor();
+                ed.ensure_cursor_visible();
+            }
+        }
+        (_, KeyCode::Left) => {
+            if ed.cursor_col > 0 {
+                ed.cursor_col -= 1;
+            } else if ed.cursor_row > 0 {
+                ed.cursor_row -= 1;
+                ed.cursor_col = ed.lines[ed.cursor_row].chars().count();
+            }
+            ed.ensure_cursor_visible();
+        }
+        (_, KeyCode::Right) => {
+            let line_len = ed.lines[ed.cursor_row].chars().count();
+            if ed.cursor_col < line_len {
+                ed.cursor_col += 1;
+            } else if ed.cursor_row + 1 < ed.lines.len() {
+                ed.cursor_row += 1;
+                ed.cursor_col = 0;
+            }
+            ed.ensure_cursor_visible();
+        }
+        (_, KeyCode::Home) => {
+            ed.cursor_col = 0;
+            ed.ensure_cursor_visible();
+        }
+        (_, KeyCode::End) => {
+            ed.cursor_col = ed.lines[ed.cursor_row].chars().count();
+            ed.ensure_cursor_visible();
+        }
+        (_, KeyCode::PageUp) => {
+            ed.cursor_row = ed.cursor_row.saturating_sub(ed.viewport_rows);
+            ed.clamp_cursor();
+            ed.ensure_cursor_visible();
+        }
+        (_, KeyCode::PageDown) => {
+            ed.cursor_row = (ed.cursor_row + ed.viewport_rows).min(ed.lines.len().saturating_sub(1));
+            ed.clamp_cursor();
+            ed.ensure_cursor_visible();
+        }
+        // Editing
+        (_, KeyCode::Enter) => {
+            ed.push_undo();
+            ed.insert_newline();
+        }
+        (_, KeyCode::Backspace) => {
+            ed.push_undo();
+            ed.backspace();
+        }
+        (_, KeyCode::Delete) => {
+            ed.push_undo();
+            ed.delete_char();
+        }
+        (_, KeyCode::Tab) => {
+            ed.push_undo();
+            for _ in 0..4 {
+                ed.insert_char(' ');
+            }
+        }
+        // Character insertion
+        (KeyModifiers::NONE | KeyModifiers::SHIFT, KeyCode::Char(c)) => {
+            ed.push_undo();
+            ed.insert_char(c);
+        }
+        _ => {}
+    }
 }
 
 /// Collect paths for operations: marked entries if any, otherwise current entry.

@@ -1,6 +1,7 @@
 pub mod boot;
 mod header;
 mod breadcrumb;
+mod editor;
 mod list;
 mod sidebar;
 mod preview;
@@ -74,8 +75,16 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     header::render(f, app, outer[0]);
     breadcrumb::render(f, app, outer[1]);
 
-    // Recursive search takes over the full body area
-    if app.mode == crate::app::Mode::RecursiveSearch {
+    // Editor / RecursiveSearch take over the full body area
+    if app.mode == crate::app::Mode::Edit {
+        // Update editor viewport dimensions
+        if let Some(ed) = &mut app.editor {
+            let gutter_w = format!("{}", ed.lines.len()).len().max(3) + 2;
+            ed.viewport_rows = outer[2].height as usize - 1; // minus title bar
+            ed.viewport_cols = (outer[2].width as usize).saturating_sub(gutter_w);
+        }
+        editor::render(f, app, outer[2]);
+    } else if app.mode == crate::app::Mode::RecursiveSearch {
         list::render_rsearch(f, app, outer[2]);
     } else {
         // Right panel visibility: show if wide enough AND not Hidden
@@ -156,6 +165,16 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     breadcrumb::render_pane(f, app, 0, breadcrumb_halves[0], app.active_pane == 0);
     breadcrumb::render_pane(f, app, 1, breadcrumb_halves[1], app.active_pane == 1);
 
+    // Editor takes over full body in dual-pane mode too
+    if app.mode == crate::app::Mode::Edit {
+        if let Some(ed) = &mut app.editor {
+            let gutter_w = format!("{}", ed.lines.len()).len().max(3) + 2;
+            ed.viewport_rows = outer[2].height as usize - 1;
+            ed.viewport_cols = (outer[2].width as usize).saturating_sub(gutter_w);
+        }
+        editor::render(f, app, outer[2]);
+    } else {
+
     // Split body into two halves
     let body_halves = Layout::default()
         .direction(Direction::Horizontal)
@@ -189,6 +208,8 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     }
 
     list::render_pane(f, app, 1, body_halves[1]);
+
+    } // end else (non-Edit mode body rendering)
 
     if app.show_telemetry {
         telemetry::render(f, app, outer[3]);

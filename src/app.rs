@@ -41,6 +41,7 @@ pub enum Mode {
     WaitingForDeleteMark, // 'M' pressed, awaiting key to delete mark
     RecursiveSearch,
     BulkRename,           // editing find/replace, Tab switches fields, Enter applies
+    Edit,                 // in-app text editor
 }
 
 #[derive(PartialEq, Eq, Clone)]
@@ -84,6 +85,210 @@ pub struct OpFeedback {
     pub success: bool,
     pub label: String,
     pub timestamp: Instant,
+}
+
+/// Snapshot for editor undo.
+pub struct EditorSnapshot {
+    pub lines: Vec<String>,
+    pub cursor_row: usize,
+    pub cursor_col: usize,
+}
+
+/// In-app text editor state.
+pub struct EditorState {
+    pub path: PathBuf,
+    pub lines: Vec<String>,
+    pub cursor_row: usize,
+    pub cursor_col: usize,
+    pub scroll_row: usize,
+    pub scroll_col: usize,
+    pub dirty: bool,
+    pub undo_stack: Vec<EditorSnapshot>,
+    pub viewport_rows: usize,
+    pub viewport_cols: usize,
+    pub confirm_exit: bool,
+}
+
+impl EditorState {
+    /// Open a file for editing. Rejects binary files and files > 1MB.
+    pub fn open(path: PathBuf) -> Result<Self, String> {
+        let meta = std::fs::metadata(&path).map_err(|e| format!("CANNOT READ: {}", e))?;
+        if meta.len() > 1_048_576 {
+            return Err("FILE TOO LARGE (> 1MB)".to_string());
+        }
+
+        let bytes = std::fs::read(&path).map_err(|e| format!("READ ERROR: {}", e))?;
+
+        // Binary detection: check first 512 bytes for null bytes
+        let check_len = bytes.len().min(512);
+        if bytes[..check_len].contains(&0) {
+            return Err("BINARY FILE".to_string());
+        }
+
+        let content = String::from_utf8_lossy(&bytes);
+        let lines: Vec<String> = if content.is_empty() {
+            vec![String::new()]
+        } else {
+            content.lines().map(|l| l.replace('\t', "    ")).collect()
+        };
+        // Ensure at least one line
+        let lines = if lines.is_empty() { vec![String::new()] } else { lines };
+
+        Ok(Self {
+            path,
+            lines,
+            cursor_row: 0,
+            cursor_col: 0,
+            scroll_row: 0,
+            scroll_col: 0,
+            dirty: false,
+            undo_stack: Vec::new(),
+            viewport_rows: 20,
+            viewport_cols: 80,
+            confirm_exit: false,
+        })
+    }
+
+    pub fn push_undo(&mut self) {
+        self.undo_stack.push(EditorSnapshot {
+            lines: self.lines.clone(),
+            cursor_row: self.cursor_row,
+            cursor_col: self.cursor_col,
+        });
+        // Cap undo stack
+        if self.undo_stack.len() > 100 {
+            self.undo_stack.remove(0);
+        }
+    }
+
+    pub fn undo(&mut self) {
+        if let Some(snap) = self.undo_stack.pop() {
+            self.lines = snap.lines;
+            self.cursor_row = snap.cursor_row;
+            self.cursor_col = snap.cursor_col;
+            self.clamp_cursor();
+            self.ensure_cursor_visible();
+            self.dirty = true;
+        }
+    }
+
+    pub fn insert_char(&mut self, c: char) {
+        let line = &mut self.lines[self.cursor_row];
+        let byte_idx = char_to_byte(line, self.cursor_col);
+        line.insert(byte_idx, c);
+        self.cursor_col += 1;
+        self.dirty = true;
+        self.ensure_cursor_visible();
+    }
+
+    pub fn insert_newline(&mut self) {
+        let line = &self.lines[self.cursor_row];
+        let byte_idx = char_to_byte(line, self.cursor_col);
+        let rest = line[byte_idx..].to_string();
+        self.lines[self.cursor_row] = line[..byte_idx].to_string();
+        self.cursor_row += 1;
+        self.lines.insert(self.cursor_row, rest);
+        self.cursor_col = 0;
+        self.dirty = true;
+        self.ensure_cursor_visible();
+    }
+
+    pub fn backspace(&mut self) {
+        if self.cursor_col > 0 {
+            let line = &mut self.lines[self.cursor_row];
+            let byte_idx = char_to_byte(line, self.cursor_col - 1);
+            let next_byte = char_to_byte(line, self.cursor_col);
+            line.drain(byte_idx..next_byte);
+            self.cursor_col -= 1;
+            self.dirty = true;
+        } else if self.cursor_row > 0 {
+            // Join with previous line
+            let current = self.lines.remove(self.cursor_row);
+            self.cursor_row -= 1;
+            self.cursor_col = self.lines[self.cursor_row].chars().count();
+            self.lines[self.cursor_row].push_str(&current);
+            self.dirty = true;
+        }
+        self.ensure_cursor_visible();
+    }
+
+    pub fn delete_char(&mut self) {
+        let line_len = self.lines[self.cursor_row].chars().count();
+        if self.cursor_col < line_len {
+            let line = &mut self.lines[self.cursor_row];
+            let byte_idx = char_to_byte(line, self.cursor_col);
+            let next_byte = char_to_byte(line, self.cursor_col + 1);
+            line.drain(byte_idx..next_byte);
+            self.dirty = true;
+        } else if self.cursor_row + 1 < self.lines.len() {
+            // Join with next line
+            let next = self.lines.remove(self.cursor_row + 1);
+            self.lines[self.cursor_row].push_str(&next);
+            self.dirty = true;
+        }
+    }
+
+    pub fn delete_line(&mut self) {
+        if self.lines.len() > 1 {
+            self.lines.remove(self.cursor_row);
+            if self.cursor_row >= self.lines.len() {
+                self.cursor_row = self.lines.len() - 1;
+            }
+        } else {
+            self.lines[0].clear();
+        }
+        self.clamp_cursor();
+        self.dirty = true;
+        self.ensure_cursor_visible();
+    }
+
+    pub fn kill_to_eol(&mut self) {
+        let byte_idx = char_to_byte(&self.lines[self.cursor_row], self.cursor_col);
+        self.lines[self.cursor_row].truncate(byte_idx);
+        self.dirty = true;
+    }
+
+    pub fn save(&mut self) -> Result<(), String> {
+        let content = self.lines.join("\n");
+        // Add trailing newline if the file has content
+        let output = if content.is_empty() { content } else { format!("{}\n", content) };
+        std::fs::write(&self.path, output).map_err(|e| format!("SAVE FAILED: {}", e))?;
+        self.dirty = false;
+        Ok(())
+    }
+
+    pub fn clamp_cursor(&mut self) {
+        if self.cursor_row >= self.lines.len() {
+            self.cursor_row = self.lines.len().saturating_sub(1);
+        }
+        let line_len = self.lines[self.cursor_row].chars().count();
+        if self.cursor_col > line_len {
+            self.cursor_col = line_len;
+        }
+    }
+
+    pub fn ensure_cursor_visible(&mut self) {
+        if self.cursor_row < self.scroll_row {
+            self.scroll_row = self.cursor_row;
+        }
+        if self.cursor_row >= self.scroll_row + self.viewport_rows {
+            self.scroll_row = self.cursor_row - self.viewport_rows + 1;
+        }
+        if self.cursor_col < self.scroll_col {
+            self.scroll_col = self.cursor_col;
+        }
+        if self.cursor_col >= self.scroll_col + self.viewport_cols {
+            self.scroll_col = self.cursor_col - self.viewport_cols + 1;
+        }
+    }
+}
+
+/// Convert a char-index to a byte-index in a string.
+fn char_to_byte(s: &str, char_idx: usize) -> usize {
+    s.char_indices()
+        .nth(char_idx)
+        .map(|(i, _)| i)
+        .unwrap_or(s.len())
 }
 
 pub struct FsEntry {
@@ -215,6 +420,8 @@ pub struct App {
     pub bulk_replace: String,
     pub bulk_field: u8,               // 0 = find, 1 = replace
     pub bulk_paths: Vec<PathBuf>,     // original paths of selected entries
+    // In-app editor
+    pub editor: Option<EditorState>,
     // Directory transition animation
     pub anim_frame: u8,               // 0 = idle, 1..=3 = active frame
     pub anim_tick: Instant,            // last frame advance time
@@ -265,6 +472,7 @@ impl App {
             bulk_replace: String::new(),
             bulk_field: 0,
             bulk_paths: Vec::new(),
+            editor: None,
             anim_frame: 0,
             anim_tick: Instant::now(),
             reduce_motion: false,

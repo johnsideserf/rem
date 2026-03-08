@@ -151,6 +151,17 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
                 ("esc", "cancel"),
             ]
         }
+        Mode::Edit => {
+            vec![
+                ("arrows", "move"),
+                ("type", "insert"),
+                ("^S", "save"),
+                ("^Z", "undo"),
+                ("^D", "del line"),
+                ("^K", "kill EOL"),
+                ("esc", "exit"),
+            ]
+        }
         Mode::Confirm { .. } => unreachable!(), // handled above
     };
 

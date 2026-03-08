@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use crate::app::{App, FsEntry, Mode, PaneState, SortMode};
+use crate::app::{App, EditorState, FsEntry, Mode, PaneState, SortMode};
 
 impl App {
     pub fn load_entries(&mut self) {
@@ -152,6 +152,25 @@ impl App {
     }
 
     pub fn edit_selected(&mut self) {
+        if let Some(entry) = self.current_entry() {
+            if entry.is_dir {
+                return;
+            }
+            let path = entry.path.clone();
+            match EditorState::open(path) {
+                Ok(state) => {
+                    self.editor = Some(state);
+                    self.mode = Mode::Edit;
+                }
+                Err(msg) => {
+                    self.error = Some((msg, Instant::now()));
+                }
+            }
+        }
+    }
+
+    /// Open current file in external $EDITOR.
+    pub fn edit_external(&mut self) {
         if let Some(entry) = self.current_entry() {
             if !entry.is_dir {
                 self.open_request = Some(crate::app::OpenRequest::Editor(entry.path.clone()));
