@@ -40,6 +40,7 @@ pub enum Mode {
     WaitingForCut,        // first 'd' pressed, awaiting second 'd'
     WaitingForDeleteMark, // 'M' pressed, awaiting key to delete mark
     RecursiveSearch,
+    BulkRename,           // editing find/replace, Tab switches fields, Enter applies
 }
 
 #[derive(PartialEq, Eq, Clone)]
@@ -209,6 +210,11 @@ pub struct App {
     pub theme_picker_cursor: usize,
     pub open_request: Option<OpenRequest>,
     pub sort_mode: SortMode,
+    // Bulk rename state
+    pub bulk_find: String,
+    pub bulk_replace: String,
+    pub bulk_field: u8,               // 0 = find, 1 = replace
+    pub bulk_paths: Vec<PathBuf>,     // original paths of selected entries
     // Recursive search state
     pub rsearch_query: String,
     pub rsearch_paths: Vec<PathBuf>,          // all walked paths (relative)
@@ -251,6 +257,10 @@ impl App {
             theme_picker_cursor: 0,
             open_request: None,
             sort_mode: SortMode::default(),
+            bulk_find: String::new(),
+            bulk_replace: String::new(),
+            bulk_field: 0,
+            bulk_paths: Vec::new(),
             rsearch_query: String::new(),
             rsearch_paths: Vec::new(),
             rsearch_results: Vec::new(),

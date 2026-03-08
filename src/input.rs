@@ -34,6 +34,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         Mode::WaitingForCut => handle_waiting_cut(app, key),
         Mode::WaitingForDeleteMark => handle_delete_mark(app, key),
         Mode::RecursiveSearch => handle_rsearch(app, key),
+        Mode::BulkRename => handle_bulk_rename(app, key),
     }
 }
 
@@ -389,6 +390,16 @@ fn handle_visual(app: &mut App, key: KeyEvent) {
                 app.confirm_timer = Some(Instant::now());
             }
         }
+        (KeyModifiers::SHIFT, KeyCode::Char('R')) => {
+            let paths = collect_operation_paths(app);
+            if !paths.is_empty() {
+                app.bulk_paths = paths;
+                app.bulk_find.clear();
+                app.bulk_replace.clear();
+                app.bulk_field = 0;
+                app.mode = Mode::BulkRename;
+            }
+        }
         (KeyModifiers::NONE, KeyCode::Char('u')) => {
             app.visual_marks.clear();
             app.mode = Mode::Normal;
@@ -546,6 +557,123 @@ fn handle_rsearch(app: &mut App, key: KeyEvent) {
         }
         _ => {}
     }
+}
+
+fn handle_bulk_rename(app: &mut App, key: KeyEvent) {
+    match (key.modifiers, key.code) {
+        (_, KeyCode::Esc) => {
+            app.mode = Mode::Normal;
+        }
+        (_, KeyCode::Tab) => {
+            app.bulk_field = 1 - app.bulk_field;
+        }
+        (_, KeyCode::Enter) => {
+            // Execute the rename
+            execute_bulk_rename(app);
+        }
+        (_, KeyCode::Backspace) => {
+            if app.bulk_field == 0 {
+                app.bulk_find.pop();
+            } else {
+                app.bulk_replace.pop();
+            }
+        }
+        (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
+            if app.bulk_field == 0 {
+                app.bulk_find.clear();
+            } else {
+                app.bulk_replace.clear();
+            }
+        }
+        (KeyModifiers::NONE, KeyCode::Char(c)) => {
+            if app.bulk_field == 0 {
+                app.bulk_find.push(c);
+            } else {
+                app.bulk_replace.push(c);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn execute_bulk_rename(app: &mut App) {
+    if app.bulk_find.is_empty() && !app.bulk_replace.contains("{n}") {
+        app.error = Some(("FIND PATTERN EMPTY".to_string(), Instant::now()));
+        return;
+    }
+
+    // Build the rename plan
+    let mut renames: Vec<(std::path::PathBuf, std::path::PathBuf)> = Vec::new();
+    let mut new_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut has_conflict = false;
+
+    for (i, path) in app.bulk_paths.iter().enumerate() {
+        let name = match path.file_name() {
+            Some(n) => n.to_string_lossy().into_owned(),
+            None => continue,
+        };
+
+        let new_name = if app.bulk_find.is_empty() {
+            // Pure replacement mode with {n}
+            app.bulk_replace.replace("{n}", &(i + 1).to_string())
+        } else {
+            let replaced = name.replace(&app.bulk_find, &app.bulk_replace);
+            replaced.replace("{n}", &(i + 1).to_string())
+        };
+
+        if new_name.is_empty() || new_name == name {
+            continue;
+        }
+
+        // Check for conflicts
+        if !new_names.insert(new_name.clone()) {
+            has_conflict = true;
+            break;
+        }
+
+        let new_path = path.parent()
+            .map(|p| p.join(&new_name))
+            .unwrap_or_else(|| std::path::PathBuf::from(&new_name));
+
+        // Check if target already exists (and isn't one of the files being renamed)
+        if new_path.exists() && !app.bulk_paths.contains(&new_path) {
+            has_conflict = true;
+            break;
+        }
+
+        renames.push((path.clone(), new_path));
+    }
+
+    if has_conflict {
+        app.error = Some(("RENAME CONFLICT: DUPLICATE NAMES".to_string(), Instant::now()));
+        return;
+    }
+
+    if renames.is_empty() {
+        app.error = Some(("NO CHANGES TO APPLY".to_string(), Instant::now()));
+        return;
+    }
+
+    // Execute renames
+    let mut success = 0;
+    let mut errors = 0;
+    for (from, to) in &renames {
+        match std::fs::rename(from, to) {
+            Ok(_) => success += 1,
+            Err(_) => errors += 1,
+        }
+    }
+
+    if errors > 0 {
+        app.error = Some((
+            format!("RENAMED {}, FAILED {}", success, errors),
+            Instant::now(),
+        ));
+    }
+
+    app.visual_marks.clear();
+    app.mode = Mode::Normal;
+    app.load_entries();
 }
 
 /// Collect paths for operations: marked entries if any, otherwise current entry.

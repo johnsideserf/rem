@@ -114,6 +114,10 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     if app.show_theme_picker {
         theme_picker::render(f, app, area);
     }
+
+    if app.mode == crate::app::Mode::BulkRename {
+        render_bulk_rename(f, app, area);
+    }
 }
 
 fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
@@ -199,4 +203,90 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     if app.show_theme_picker {
         theme_picker::render(f, app, area);
     }
+
+    if app.mode == crate::app::Mode::BulkRename {
+        render_bulk_rename(f, app, area);
+    }
+}
+
+fn render_bulk_rename(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+    use ratatui::text::{Line, Span};
+    use ratatui::widgets::{Borders, BorderType, Clear, Paragraph};
+
+    let pal = app.palette;
+    let popup_w = 60u16.min(area.width.saturating_sub(4));
+    let popup_h = (app.bulk_paths.len() as u16 + 8).min(area.height.saturating_sub(4));
+    let x = area.x + (area.width.saturating_sub(popup_w)) / 2;
+    let y = area.y + (area.height.saturating_sub(popup_h)) / 2;
+    let popup = ratatui::layout::Rect::new(x, y, popup_w, popup_h);
+
+    f.render_widget(Clear, popup);
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Title
+    lines.push(Line::from(Span::styled(
+        " BULK RENAME",
+        Style::default().fg(pal.text_hot).bg(pal.bg),
+    )));
+    lines.push(Line::from(Span::raw("")));
+
+    // Find field
+    let find_label = if app.bulk_field == 0 { "\u{25b6} Find:    " } else { "  Find:    " };
+    lines.push(Line::from(vec![
+        Span::styled(find_label, Style::default().fg(pal.text_mid).bg(pal.bg)),
+        Span::styled(
+            format!("{}\u{2588}", &app.bulk_find),
+            Style::default().fg(if app.bulk_field == 0 { pal.text_hot } else { pal.text_dim }).bg(pal.bg),
+        ),
+    ]));
+
+    // Replace field
+    let repl_label = if app.bulk_field == 1 { "\u{25b6} Replace: " } else { "  Replace: " };
+    lines.push(Line::from(vec![
+        Span::styled(repl_label, Style::default().fg(pal.text_mid).bg(pal.bg)),
+        Span::styled(
+            format!("{}\u{2588}", &app.bulk_replace),
+            Style::default().fg(if app.bulk_field == 1 { pal.text_hot } else { pal.text_dim }).bg(pal.bg),
+        ),
+    ]));
+
+    lines.push(Line::from(Span::raw("")));
+
+    // Preview renames
+    let inner_w = popup_w.saturating_sub(4) as usize;
+    for path in &app.bulk_paths {
+        let name = path.file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let new_name = if !app.bulk_find.is_empty() {
+            name.replace(&app.bulk_find, &app.bulk_replace)
+        } else {
+            name.clone()
+        };
+        let changed = name != new_name;
+        let arrow = if changed { " \u{2192} " } else { " = " };
+        let display = format!(" {}{}{}", name, arrow, new_name);
+        let truncated = if display.chars().count() > inner_w {
+            let t: String = display.chars().take(inner_w.saturating_sub(1)).collect();
+            format!("{}\u{2026}", t)
+        } else {
+            display
+        };
+        lines.push(Line::from(Span::styled(
+            truncated,
+            Style::default()
+                .fg(if changed { pal.text_hot } else { pal.text_dim })
+                .bg(pal.bg),
+        )));
+    }
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(pal.border_hot))
+        .style(Style::default().bg(pal.bg));
+
+    let paragraph = Paragraph::new(lines).block(block);
+    f.render_widget(paragraph, popup);
 }

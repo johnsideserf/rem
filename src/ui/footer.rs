@@ -116,6 +116,7 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
                 ("y", "yank"),
                 ("d", "cut"),
                 ("D", "delete"),
+                ("R", "bulk rename"),
                 ("u", "clear"),
                 ("esc", "exit"),
             ]
@@ -139,6 +140,14 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
                 ("type", "filter"),
                 ("\u{2191}\u{2193}", "move"),
                 ("enter", "go to"),
+                ("esc", "cancel"),
+            ]
+        }
+        Mode::BulkRename => {
+            vec![
+                ("tab", "switch field"),
+                ("type", "edit"),
+                ("enter", "apply"),
                 ("esc", "cancel"),
             ]
         }
