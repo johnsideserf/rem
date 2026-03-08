@@ -25,6 +25,7 @@ struct BehaviorConfig {
     default_panel: Option<String>,
     boot_sequence: Option<bool>,
     sort_mode: Option<String>,
+    reduce_motion: Option<bool>,
 }
 
 pub struct Config {
@@ -33,6 +34,7 @@ pub struct Config {
     pub default_panel: RightPanel,
     pub boot_sequence: bool,
     pub sort_mode: SortMode,
+    pub reduce_motion: bool,
 }
 
 impl Default for Config {
@@ -43,6 +45,7 @@ impl Default for Config {
             default_panel: RightPanel::Info,
             boot_sequence: true,
             sort_mode: SortMode::default(),
+            reduce_motion: false,
         }
     }
 }
@@ -136,6 +139,9 @@ impl Config {
                     }
                     if let Some(v) = file.behavior.boot_sequence {
                         cfg.boot_sequence = v;
+                    }
+                    if let Some(v) = file.behavior.reduce_motion {
+                        cfg.reduce_motion = v;
                     }
                     if let Some(s) = &file.behavior.sort_mode {
                         cfg.sort_mode = match s.as_str() {

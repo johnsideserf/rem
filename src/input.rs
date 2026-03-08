@@ -7,6 +7,11 @@ use crate::sysmon::SysMon;
 use crate::throbber::{Throbber, ThrobberKind};
 
 pub fn handle_key(app: &mut App, key: KeyEvent) {
+    // Cancel any running animation on input
+    if app.anim_frame > 0 {
+        app.anim_frame = 0;
+    }
+
     // Dismiss error on any key
     if app.error.is_some() {
         app.error = None;

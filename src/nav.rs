@@ -90,6 +90,10 @@ impl App {
             pane.fuzzy_query.clear();
         }
         self.load_entries();
+        if !self.reduce_motion {
+            self.anim_frame = 1;
+            self.anim_tick = Instant::now();
+        }
         let pane = self.pane_mut();
         if pane.nav_history_cursor + 1 < pane.nav_history.len() {
             pane.nav_history.truncate(pane.nav_history_cursor + 1);

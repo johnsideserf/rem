@@ -215,6 +215,10 @@ pub struct App {
     pub bulk_replace: String,
     pub bulk_field: u8,               // 0 = find, 1 = replace
     pub bulk_paths: Vec<PathBuf>,     // original paths of selected entries
+    // Directory transition animation
+    pub anim_frame: u8,               // 0 = idle, 1..=3 = active frame
+    pub anim_tick: Instant,            // last frame advance time
+    pub reduce_motion: bool,           // disable animations
     // Recursive search state
     pub rsearch_query: String,
     pub rsearch_paths: Vec<PathBuf>,          // all walked paths (relative)
@@ -261,6 +265,9 @@ impl App {
             bulk_replace: String::new(),
             bulk_field: 0,
             bulk_paths: Vec::new(),
+            anim_frame: 0,
+            anim_tick: Instant::now(),
+            reduce_motion: false,
             rsearch_query: String::new(),
             rsearch_paths: Vec::new(),
             rsearch_results: Vec::new(),
@@ -354,6 +361,14 @@ impl App {
             throb.tick();
         }
         self.heartbeat.tick();
+        // Directory transition animation
+        if self.anim_frame > 0 && now.duration_since(self.anim_tick).as_millis() >= 70 {
+            self.anim_frame += 1;
+            self.anim_tick = now;
+            if self.anim_frame > 3 {
+                self.anim_frame = 0;
+            }
+        }
     }
 }
 

@@ -1,10 +1,24 @@
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Modifier, Style};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
 
 use crate::app::{App, Mode, OpType, JUMP_KEYS, file_type_badge, format_size, icon_for, FsEntry};
+
+/// Interpolate between two RGB colors. `t` ranges from 0.0 (fully `from`) to 1.0 (fully `to`).
+fn lerp_color(from: Color, to: Color, t: f32) -> Color {
+    match (from, to) {
+        (Color::Rgb(fr, fg, fb), Color::Rgb(tr, tg, tb)) => {
+            Color::Rgb(
+                (fr as f32 + (tr as f32 - fr as f32) * t) as u8,
+                (fg as f32 + (tg as f32 - fg as f32) * t) as u8,
+                (fb as f32 + (tb as f32 - fb as f32) * t) as u8,
+            )
+        }
+        _ => to,
+    }
+}
 
 /// Truncate string to `max_chars` characters, with ellipsis if needed, padded to `pad_to`.
 fn trunc_pad(s: &str, max_chars: usize, pad_to: usize) -> String {
@@ -27,6 +41,20 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
     let pane = &app.panes[pane_idx];
     let is_active = pane_idx == app.active_pane;
     let width = area.width as usize;
+
+    // Animation: compute fade factor and horizontal offset
+    let (anim_t, anim_offset) = if is_active && app.anim_frame > 0 {
+        let t = app.anim_frame as f32 / 4.0; // 1→0.25, 2→0.50, 3→0.75
+        let offset = match app.anim_frame {
+            1 => 6usize,
+            2 => 3,
+            3 => 1,
+            _ => 0,
+        };
+        (t, offset)
+    } else {
+        (1.0, 0)
+    };
 
     // Determine which columns to show
     let show_size = width >= 90;
@@ -64,8 +92,8 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
         let is_copied = copy_paths.contains(&entry.path);
         let is_fuzzy_match = !pane.fuzzy_query.is_empty();
 
-        let row_bg = if is_cursor { pal.surface } else { pal.bg };
-        let text_color = if is_cursor {
+        let row_bg_base = if is_cursor { pal.surface } else { pal.bg };
+        let text_color_base = if is_cursor {
             pal.text_hot
         } else if is_cut {
             pal.text_dim
@@ -77,7 +105,19 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
             pal.text_dim
         };
 
+        // Apply animation fade
+        let row_bg = if anim_t < 1.0 { lerp_color(pal.bg, row_bg_base, anim_t) } else { row_bg_base };
+        let text_color = if anim_t < 1.0 { lerp_color(pal.bg, text_color_base, anim_t) } else { text_color_base };
+
         let mut spans: Vec<Span> = Vec::new();
+
+        // Animation: horizontal offset (slide-in from right)
+        if anim_offset > 0 {
+            spans.push(Span::styled(
+                " ".repeat(anim_offset),
+                Style::default().bg(pal.bg),
+            ));
+        }
 
         // Indicator column: ▶ cursor, ◆ marked, ✂ cut, ⊕ copied
         let indicator = if is_cursor && is_marked {
