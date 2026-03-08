@@ -87,6 +87,61 @@ pub struct OpFeedback {
     pub timestamp: Instant,
 }
 
+/// Git repository info for the current directory.
+#[derive(Clone)]
+pub struct GitInfo {
+    pub branch: String,
+    pub dirty: bool,
+}
+
+impl GitInfo {
+    /// Detect git branch and dirty status for a given directory.
+    pub fn detect(dir: &std::path::Path) -> Option<Self> {
+        // Walk up to find .git
+        let mut current = dir.to_path_buf();
+        let git_dir = loop {
+            let dot_git = current.join(".git");
+            if dot_git.is_dir() {
+                break dot_git;
+            }
+            // .git can also be a file (worktrees)
+            if dot_git.is_file() {
+                if let Ok(content) = std::fs::read_to_string(&dot_git) {
+                    if let Some(path) = content.strip_prefix("gitdir: ") {
+                        let resolved = current.join(path.trim());
+                        if resolved.is_dir() {
+                            break resolved;
+                        }
+                    }
+                }
+            }
+            if !current.pop() {
+                return None;
+            }
+        };
+
+        // Read HEAD
+        let head_path = git_dir.join("HEAD");
+        let head = std::fs::read_to_string(head_path).ok()?;
+        let branch = if let Some(r) = head.strip_prefix("ref: refs/heads/") {
+            r.trim().to_string()
+        } else {
+            // Detached HEAD — show short hash
+            head.trim().chars().take(7).collect()
+        };
+
+        // Dirty check: run git status --porcelain (fast)
+        let dirty = std::process::Command::new("git")
+            .args(["status", "--porcelain", "-uno"])
+            .current_dir(dir)
+            .output()
+            .map(|o| !o.stdout.is_empty())
+            .unwrap_or(false);
+
+        Some(GitInfo { branch, dirty })
+    }
+}
+
 /// Snapshot for editor undo.
 pub struct EditorSnapshot {
     pub lines: Vec<String>,
@@ -420,6 +475,8 @@ pub struct App {
     pub bulk_replace: String,
     pub bulk_field: u8,               // 0 = find, 1 = replace
     pub bulk_paths: Vec<PathBuf>,     // original paths of selected entries
+    // Git info
+    pub git_info: Option<GitInfo>,
     // In-app editor
     pub editor: Option<EditorState>,
     // Directory transition animation
@@ -472,6 +529,7 @@ impl App {
             bulk_replace: String::new(),
             bulk_field: 0,
             bulk_paths: Vec::new(),
+            git_info: None,
             editor: None,
             anim_frame: 0,
             anim_tick: Instant::now(),
@@ -483,6 +541,7 @@ impl App {
             rsearch_scroll: 0,
         };
         app.load_entries();
+        app.git_info = GitInfo::detect(&app.panes[0].current_dir);
         app
     }
 

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use crate::app::{App, EditorState, FsEntry, Mode, PaneState, SortMode};
+use crate::app::{App, EditorState, FsEntry, GitInfo, Mode, PaneState, SortMode};
 
 impl App {
     pub fn load_entries(&mut self) {
@@ -90,6 +90,7 @@ impl App {
             pane.fuzzy_query.clear();
         }
         self.load_entries();
+        self.git_info = GitInfo::detect(&dir);
         if !self.reduce_motion {
             self.anim_frame = 1;
             self.anim_tick = Instant::now();

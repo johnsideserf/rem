@@ -33,6 +33,22 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         Span::styled(format!("ITEMS:{}", item_count), Style::default().fg(pal.text_hot)),
     ];
 
+    // Git branch
+    if let Some(git) = &app.git_info {
+        spans.push(Span::styled("  \u{00b7}  ", Style::default().fg(pal.text_dim)));
+        let dirty_sigil = if git.dirty { "\u{25c6}" } else { "" };
+        let branch_display = if git.branch.chars().count() > 20 {
+            let t: String = git.branch.chars().take(19).collect();
+            format!("{}\u{2026}", t)
+        } else {
+            git.branch.clone()
+        };
+        spans.push(Span::styled(
+            format!("BR:{}{}", branch_display, dirty_sigil),
+            Style::default().fg(pal.text_mid),
+        ));
+    }
+
     if mark_count > 0 {
         spans.push(Span::styled("  \u{00b7}  ", Style::default().fg(pal.text_dim)));
         spans.push(Span::styled(
