@@ -23,7 +23,13 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
             0
         };
 
-        let progress_str = format!("{}/{}", bg.done, bg.total);
+        let elapsed = bg.started.elapsed().as_secs();
+        let elapsed_str = if elapsed >= 60 {
+            format!("{}m{}s", elapsed / 60, elapsed % 60)
+        } else {
+            format!("{}s", elapsed)
+        };
+        let progress_str = format!("{}/{}  {}", bg.done, bg.total, elapsed_str);
         let file_display = if bg.current_file.len() > 20 {
             format!("{}\u{2026}", &bg.current_file[..19])
         } else {

@@ -41,6 +41,7 @@ pub enum Mode {
 }
 
 #[derive(PartialEq, Eq, Clone)]
+#[allow(dead_code)]
 pub enum PendingAction {
     Delete { paths: Vec<PathBuf> },
     Overwrite { src: PathBuf, dest: PathBuf },

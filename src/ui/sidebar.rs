@@ -48,6 +48,25 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
             ]));
         }
 
+        if let Some(modified) = entry.modified {
+            if let Ok(duration) = modified.elapsed() {
+                let secs = duration.as_secs();
+                let age = if secs < 60 {
+                    format!("{}s ago", secs)
+                } else if secs < 3600 {
+                    format!("{}m ago", secs / 60)
+                } else if secs < 86400 {
+                    format!("{}h ago", secs / 3600)
+                } else {
+                    format!("{}d ago", secs / 86400)
+                };
+                lines.push(Line::from(vec![
+                    Span::styled(" MOD   ", Style::default().fg(pal.text_dim).bg(pal.bg)),
+                    Span::styled(age, Style::default().fg(pal.text_hot).bg(pal.bg)),
+                ]));
+            }
+        }
+
         if entry.is_dir {
             if let Ok(rd) = std::fs::read_dir(&entry.path) {
                 let count = rd.count();

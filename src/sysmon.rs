@@ -8,7 +8,6 @@ const SPARKLINE_LEN: usize = 30;
 
 /// Per-drive info snapshot.
 pub struct DiskInfo {
-    pub name: String,
     pub mount: String,
     pub total: u64,
     pub used: u64,
@@ -88,12 +87,10 @@ impl SysMon {
     fn refresh_disks(&mut self) {
         self.disks.refresh(true);
         self.disk_info = self.disks.iter().map(|d| {
-            let name = d.name().to_string_lossy().into_owned();
             let mount = d.mount_point().to_string_lossy().into_owned();
             let total = d.total_space();
             let avail = d.available_space();
             DiskInfo {
-                name: if name.is_empty() { mount.clone() } else { name },
                 mount,
                 total,
                 used: total.saturating_sub(avail),

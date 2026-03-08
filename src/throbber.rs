@@ -99,10 +99,4 @@ impl Throbber {
     pub fn frame(&self) -> &str {
         self.frames[self.current]
     }
-
-    /// Reset to first frame.
-    pub fn reset(&mut self) {
-        self.current = 0;
-        self.tick_count = 0;
-    }
 }
