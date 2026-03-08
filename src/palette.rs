@@ -1,5 +1,7 @@
 use ratatui::style::Color;
 
+use crate::throbber::PaletteVariant;
+
 #[derive(Clone, Copy)]
 pub struct Palette {
     pub bg: Color,
@@ -11,6 +13,7 @@ pub struct Palette {
     pub border_mid: Color,
     pub border_hot: Color,
     pub warn: Color,
+    pub variant: PaletteVariant,
 }
 
 impl Palette {
@@ -25,6 +28,7 @@ impl Palette {
             border_mid: Color::Rgb(0, 61, 16),
             border_hot: Color::Rgb(0, 122, 34),
             warn: Color::Rgb(255, 68, 68),
+            variant: PaletteVariant::Green,
         }
     }
 
@@ -39,6 +43,7 @@ impl Palette {
             border_mid: Color::Rgb(107, 74, 0),
             border_hot: Color::Rgb(128, 88, 0),
             warn: Color::Rgb(255, 68, 68),
+            variant: PaletteVariant::Amber,
         }
     }
 
@@ -53,6 +58,7 @@ impl Palette {
             border_mid: Color::Rgb(0, 48, 64),
             border_hot: Color::Rgb(0, 96, 122),
             warn: Color::Rgb(255, 68, 68),
+            variant: PaletteVariant::Cyan,
         }
     }
 }

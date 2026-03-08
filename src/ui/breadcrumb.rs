@@ -7,9 +7,13 @@ use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 use crate::app::App;
 
 pub fn render(f: &mut Frame, app: &App, area: Rect) {
+    render_pane(f, app, app.active_pane, area, true);
+}
+
+pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect, show_cursor: bool) {
     let pal = app.palette;
 
-    let path_str = app.current_dir.to_string_lossy();
+    let path_str = app.panes[pane_idx].current_dir.to_string_lossy().into_owned();
     let segments: Vec<&str> = path_str.split(['/', '\\']).filter(|s| !s.is_empty()).collect();
 
     let mut spans = vec![Span::styled(" ", Style::default())];
@@ -46,8 +50,8 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         built.push_str(&addition);
     }
 
-    // Blinking cursor
-    if app.blink_on {
+    // Blinking cursor (only on active pane)
+    if show_cursor && app.blink_on {
         spans.push(Span::styled(" \u{258b}", Style::default().fg(pal.text_hot)));
     } else {
         spans.push(Span::styled("  ", Style::default()));

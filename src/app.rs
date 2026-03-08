@@ -1,17 +1,85 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::mpsc;
 use std::time::{Instant, SystemTime};
 
 use crate::palette::Palette;
+use crate::sysmon::SysMon;
+use crate::throbber::{Throbber, ThrobberKind};
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum RightPanel {
+    Info,
+    Preview,
+    Hidden,
+}
+
+impl RightPanel {
+    pub fn cycle(self) -> Self {
+        match self {
+            Self::Info => Self::Preview,
+            Self::Preview => Self::Hidden,
+            Self::Hidden => Self::Info,
+        }
+    }
+}
 
 #[derive(PartialEq, Eq)]
 pub enum Mode {
     Normal,
     FuzzySearch,
     JumpKey,
+    Visual,
+    Rename,
+    Create { is_dir: bool },
+    Confirm { action: PendingAction },
     WaitingForG,
     WaitingForMark,
     WaitingForJumpToMark,
+    WaitingForYank,   // first 'y' pressed, awaiting second 'y'
+    WaitingForCut,    // first 'd' pressed, awaiting second 'd'
+}
+
+#[derive(PartialEq, Eq, Clone)]
+pub enum PendingAction {
+    Delete { paths: Vec<PathBuf> },
+    Overwrite { src: PathBuf, dest: PathBuf },
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum OpType {
+    Copy,
+    Cut,
+}
+
+pub struct OpBuffer {
+    pub paths: Vec<PathBuf>,
+    pub op: OpType,
+}
+
+/// Progress message from background operation thread.
+pub enum OpMessage {
+    Progress { done: u64, total: u64, current_file: String },
+    Complete,
+    Error(String),
+}
+
+/// Tracks an active background operation.
+pub struct BgOperation {
+    pub label: String,
+    pub throbber: Throbber,
+    pub done: u64,
+    pub total: u64,
+    pub current_file: String,
+    pub receiver: mpsc::Receiver<OpMessage>,
+    pub started: Instant,
+}
+
+/// Result feedback shown briefly after an operation completes.
+pub struct OpFeedback {
+    pub success: bool,
+    pub label: String,
+    pub timestamp: Instant,
 }
 
 pub struct FsEntry {
@@ -22,51 +90,113 @@ pub struct FsEntry {
     pub modified: Option<SystemTime>,
 }
 
-pub struct App {
+pub struct PaneState {
     pub current_dir: PathBuf,
     pub entries: Vec<FsEntry>,
     pub cursor: usize,
     pub scroll_offset: usize,
-    pub mode: Mode,
+    pub filtered_indices: Vec<usize>,
+    pub fuzzy_match_positions: HashMap<usize, Vec<usize>>,  // entry index -> matched char positions
+    pub fuzzy_query: String,
     pub nav_history: Vec<PathBuf>,
     pub nav_history_cursor: usize,
+    pub viewport_height: usize,
+}
+
+impl PaneState {
+    pub fn new(start_dir: PathBuf) -> Self {
+        Self {
+            current_dir: start_dir.clone(),
+            entries: Vec::new(),
+            cursor: 0,
+            scroll_offset: 0,
+            filtered_indices: Vec::new(),
+            fuzzy_match_positions: HashMap::new(),
+            fuzzy_query: String::new(),
+            nav_history: vec![start_dir],
+            nav_history_cursor: 0,
+            viewport_height: 20,
+        }
+    }
+}
+
+pub struct App {
+    pub panes: [PaneState; 2],
+    pub active_pane: usize,
+    pub dual_pane: bool,
+    pub show_hidden: bool,
+    pub right_panel: RightPanel,
+    pub preview_scroll: usize,
+    pub mode: Mode,
     pub marks: HashMap<char, PathBuf>,
-    pub fuzzy_query: String,
-    pub filtered_indices: Vec<usize>,
     pub error: Option<(String, Instant)>,
     pub blink_on: bool,
     pub last_blink: Instant,
     pub palette: Palette,
     pub should_quit: bool,
     pub selected_path: Option<PathBuf>,
-    pub viewport_height: usize,
     pub last_dir_before_jump: Option<PathBuf>,
+    pub heartbeat: Throbber,
+    pub visual_marks: std::collections::HashSet<usize>,
+    pub op_buffer: Option<OpBuffer>,
+    pub rename_buf: String,
+    pub create_buf: String,
+    pub confirm_timer: Option<Instant>,
+    pub bg_operation: Option<BgOperation>,
+    pub op_feedback: Option<OpFeedback>,
+    pub show_telemetry: bool,
+    pub sysmon: Option<SysMon>,
+    pub telemetry_throbber: Option<Throbber>,
+    pub sidebar_pct: u16,
+    pub show_theme_picker: bool,
+    pub theme_picker_cursor: usize,
 }
 
 impl App {
     pub fn new(start_dir: PathBuf, palette: Palette) -> Self {
         let mut app = Self {
-            current_dir: start_dir.clone(),
-            entries: Vec::new(),
-            cursor: 0,
-            scroll_offset: 0,
+            panes: [PaneState::new(start_dir.clone()), PaneState::new(start_dir)],
+            active_pane: 0,
+            dual_pane: false,
+            show_hidden: true,
+            right_panel: RightPanel::Info,
+            preview_scroll: 0,
             mode: Mode::Normal,
-            nav_history: vec![start_dir],
-            nav_history_cursor: 0,
             marks: HashMap::new(),
-            fuzzy_query: String::new(),
-            filtered_indices: Vec::new(),
             error: None,
             blink_on: true,
             last_blink: Instant::now(),
             palette,
             should_quit: false,
             selected_path: None,
-            viewport_height: 20,
             last_dir_before_jump: None,
+            heartbeat: Throbber::new(ThrobberKind::Heartbeat, palette.variant),
+            visual_marks: std::collections::HashSet::new(),
+            op_buffer: None,
+            rename_buf: String::new(),
+            create_buf: String::new(),
+            confirm_timer: None,
+            bg_operation: None,
+            op_feedback: None,
+            show_telemetry: false,
+            sysmon: None,
+            telemetry_throbber: None,
+            sidebar_pct: 22,
+            show_theme_picker: false,
+            theme_picker_cursor: 0,
         };
         app.load_entries();
         app
+    }
+
+    /// Active pane reference.
+    pub fn pane(&self) -> &PaneState {
+        &self.panes[self.active_pane]
+    }
+
+    /// Active pane mutable reference.
+    pub fn pane_mut(&mut self) -> &mut PaneState {
+        &mut self.panes[self.active_pane]
     }
 
     pub fn tick(&mut self) {
@@ -80,180 +210,68 @@ impl App {
                 self.error = None;
             }
         }
-    }
-
-    pub fn load_entries(&mut self) {
-        self.entries.clear();
-        match std::fs::read_dir(&self.current_dir) {
-            Ok(rd) => {
-                for entry in rd.flatten() {
-                    let meta = entry.metadata().ok();
-                    let is_dir = meta.as_ref().map_or(false, |m| m.is_dir());
-                    let size = meta.as_ref().and_then(|m| if !m.is_dir() { Some(m.len()) } else { None });
-                    let modified = meta.as_ref().and_then(|m| m.modified().ok());
-                    self.entries.push(FsEntry {
-                        name: entry.file_name().to_string_lossy().into_owned(),
-                        path: entry.path(),
-                        is_dir,
-                        size,
-                        modified,
-                    });
+        // Auto-cancel confirm after 10 seconds
+        if let Some(ts) = self.confirm_timer {
+            if now.duration_since(ts).as_secs() >= 10 {
+                self.confirm_timer = None;
+                self.mode = Mode::Normal;
+            }
+        }
+        // Poll background operation
+        let mut op_finished = false;
+        if let Some(bg) = &mut self.bg_operation {
+            bg.throbber.tick();
+            while let Ok(msg) = bg.receiver.try_recv() {
+                match msg {
+                    OpMessage::Progress { done, total, current_file } => {
+                        bg.done = done;
+                        bg.total = total;
+                        bg.current_file = current_file;
+                    }
+                    OpMessage::Complete => {
+                        self.op_feedback = Some(OpFeedback {
+                            success: true,
+                            label: format!("\u{2713} {}", bg.label),
+                            timestamp: Instant::now(),
+                        });
+                        op_finished = true;
+                    }
+                    OpMessage::Error(e) => {
+                        self.op_feedback = Some(OpFeedback {
+                            success: false,
+                            label: format!("\u{2717} {}", e),
+                            timestamp: Instant::now(),
+                        });
+                        op_finished = true;
+                    }
                 }
-                // Sort: dirs first, then alphabetical case-insensitive
-                self.entries.sort_by(|a, b| {
-                    b.is_dir.cmp(&a.is_dir)
-                        .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
-                });
-            }
-            Err(e) => {
-                self.error = Some((format!("CANNOT READ: {}", e), Instant::now()));
             }
         }
-        self.rebuild_filtered();
-    }
-
-    pub fn rebuild_filtered(&mut self) {
-        if self.fuzzy_query.is_empty() {
-            self.filtered_indices = (0..self.entries.len()).collect();
-        } else {
-            use fuzzy_matcher::FuzzyMatcher;
-            use fuzzy_matcher::skim::SkimMatcherV2;
-            let matcher = SkimMatcherV2::default();
-            let mut scored: Vec<(usize, i64)> = self.entries.iter().enumerate()
-                .filter_map(|(i, e)| {
-                    matcher.fuzzy_match(&e.name, &self.fuzzy_query).map(|s| (i, s))
-                })
-                .collect();
-            scored.sort_by(|a, b| b.1.cmp(&a.1));
-            self.filtered_indices = scored.into_iter().map(|(i, _)| i).collect();
-        }
-    }
-
-    pub fn navigate_to(&mut self, dir: PathBuf) {
-        self.current_dir = dir.clone();
-        self.cursor = 0;
-        self.scroll_offset = 0;
-        self.fuzzy_query.clear();
-        self.load_entries();
-        // Push to nav history
-        if self.nav_history_cursor + 1 < self.nav_history.len() {
-            self.nav_history.truncate(self.nav_history_cursor + 1);
-        }
-        self.nav_history.push(dir);
-        self.nav_history_cursor = self.nav_history.len() - 1;
-    }
-
-    pub fn go_parent(&mut self) {
-        if let Some(parent) = self.current_dir.parent().map(|p| p.to_path_buf()) {
-            self.navigate_to(parent);
-        }
-    }
-
-    pub fn nav_back(&mut self) {
-        if self.nav_history_cursor > 0 {
-            self.nav_history_cursor -= 1;
-            let dir = self.nav_history[self.nav_history_cursor].clone();
-            self.current_dir = dir;
-            self.cursor = 0;
-            self.scroll_offset = 0;
-            self.fuzzy_query.clear();
+        if op_finished {
+            self.bg_operation = None;
             self.load_entries();
-        }
-    }
-
-    pub fn nav_forward(&mut self) {
-        if self.nav_history_cursor + 1 < self.nav_history.len() {
-            self.nav_history_cursor += 1;
-            let dir = self.nav_history[self.nav_history_cursor].clone();
-            self.current_dir = dir;
-            self.cursor = 0;
-            self.scroll_offset = 0;
-            self.fuzzy_query.clear();
-            self.load_entries();
-        }
-    }
-
-    pub fn enter_selected(&mut self) {
-        if let Some(&idx) = self.filtered_indices.get(self.cursor) {
-            let entry = &self.entries[idx];
-            if entry.is_dir {
-                let path = entry.path.clone();
-                self.navigate_to(path);
-            } else {
-                self.selected_path = Some(entry.path.clone());
+            // Refresh other pane too
+            if self.dual_pane {
+                let old = self.active_pane;
+                self.active_pane = 1 - old;
+                self.load_entries();
+                self.active_pane = old;
             }
         }
-    }
-
-    pub fn cursor_down(&mut self) {
-        if self.cursor + 1 < self.filtered_indices.len() {
-            self.cursor += 1;
-            self.ensure_visible();
-        }
-    }
-
-    pub fn cursor_up(&mut self) {
-        if self.cursor > 0 {
-            self.cursor -= 1;
-            self.ensure_visible();
-        }
-    }
-
-    pub fn jump_top(&mut self) {
-        self.cursor = 0;
-        self.scroll_offset = 0;
-    }
-
-    pub fn jump_bottom(&mut self) {
-        if !self.filtered_indices.is_empty() {
-            self.cursor = self.filtered_indices.len() - 1;
-            self.ensure_visible();
-        }
-    }
-
-    pub fn scroll_half_up(&mut self) {
-        let half = self.viewport_height / 2;
-        self.cursor = self.cursor.saturating_sub(half);
-        self.ensure_visible();
-    }
-
-    pub fn scroll_half_down(&mut self) {
-        let half = self.viewport_height / 2;
-        self.cursor = (self.cursor + half).min(self.filtered_indices.len().saturating_sub(1));
-        self.ensure_visible();
-    }
-
-    fn ensure_visible(&mut self) {
-        if self.cursor < self.scroll_offset {
-            self.scroll_offset = self.cursor;
-        }
-        if self.cursor >= self.scroll_offset + self.viewport_height {
-            self.scroll_offset = self.cursor - self.viewport_height + 1;
-        }
-    }
-
-    pub fn current_entry(&self) -> Option<&FsEntry> {
-        self.filtered_indices.get(self.cursor).map(|&i| &self.entries[i])
-    }
-
-    pub fn set_mark(&mut self, c: char) {
-        self.marks.insert(c, self.current_dir.clone());
-    }
-
-    pub fn jump_to_mark(&mut self, c: char) {
-        if c == '\'' {
-            // Jump to last position before last jump
-            if let Some(dir) = self.last_dir_before_jump.clone() {
-                let old = self.current_dir.clone();
-                self.navigate_to(dir);
-                self.last_dir_before_jump = Some(old);
+        // Clear feedback after 3 seconds
+        if let Some(fb) = &self.op_feedback {
+            if now.duration_since(fb.timestamp).as_secs() >= 3 {
+                self.op_feedback = None;
             }
-        } else if let Some(dir) = self.marks.get(&c).cloned() {
-            self.last_dir_before_jump = Some(self.current_dir.clone());
-            self.navigate_to(dir);
-        } else {
-            self.error = Some((format!("MARK '{}' NOT SET", c), Instant::now()));
         }
+        // Telemetry
+        if let Some(mon) = &mut self.sysmon {
+            mon.tick();
+        }
+        if let Some(throb) = &mut self.telemetry_throbber {
+            throb.tick();
+        }
+        self.heartbeat.tick();
     }
 }
 

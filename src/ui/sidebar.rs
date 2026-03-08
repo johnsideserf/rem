@@ -19,8 +19,10 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     )));
 
     if let Some(entry) = app.current_entry() {
-        let name_display = if entry.name.len() > width - 9 {
-            format!("{}\u{2026}", &entry.name[..width.saturating_sub(10)])
+        let max_name = width.saturating_sub(9);
+        let name_display = if entry.name.chars().count() > max_name {
+            let t: String = entry.name.chars().take(max_name.saturating_sub(1)).collect();
+            format!("{}\u{2026}", t)
         } else {
             entry.name.clone()
         };
@@ -87,8 +89,10 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_else(|| path.to_string_lossy().into_owned());
-            let display = if dir_name.len() > width - 7 {
-                format!("{}\u{2026}", &dir_name[..width.saturating_sub(8)])
+            let max_bm = width.saturating_sub(7);
+            let display = if dir_name.chars().count() > max_bm {
+                let t: String = dir_name.chars().take(max_bm.saturating_sub(1)).collect();
+                format!("{}\u{2026}", t)
             } else {
                 dir_name
             };

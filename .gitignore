@@ -1,1 +1,9 @@
 /target
+
+# Reference images and ASCII art
+*.png
+*.jpg
+*.jpeg
+ascii-art.txt
+ascii-art-clean.txt
+wy-ascii-dotmatrix.txt
