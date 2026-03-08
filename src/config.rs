@@ -4,6 +4,7 @@ use serde::Deserialize;
 
 use crate::app::RightPanel;
 use crate::palette::Palette;
+use crate::throbber::PaletteVariant;
 
 #[derive(Deserialize, Default)]
 struct ConfigFile {
@@ -43,8 +44,36 @@ impl Default for Config {
     }
 }
 
-fn config_path() -> Option<PathBuf> {
+pub fn config_path() -> Option<PathBuf> {
     dirs::config_dir().map(|d| d.join("rem").join("config.toml"))
+}
+
+/// Save the current theme variant to config.toml, preserving other settings.
+pub fn save_theme(variant: PaletteVariant) {
+    let Some(path) = config_path() else { return };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
+    // Read existing config or start fresh
+    let mut doc: toml::Table = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or_default();
+
+    // Update appearance.palette
+    let appearance = doc.entry("appearance")
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+    if let toml::Value::Table(t) = appearance {
+        let name = match variant {
+            PaletteVariant::Green => "green",
+            PaletteVariant::Amber => "amber",
+            PaletteVariant::Cyan => "cyan",
+        };
+        t.insert("palette".to_string(), toml::Value::String(name.to_string()));
+    }
+
+    let _ = std::fs::write(&path, doc.to_string());
 }
 
 impl Config {

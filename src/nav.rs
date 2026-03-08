@@ -180,6 +180,7 @@ impl App {
     pub fn set_mark(&mut self, c: char) {
         let dir = self.pane().current_dir.clone();
         self.marks.insert(c, dir);
+        crate::marks::save_marks(&self.marks);
     }
 
     pub fn jump_to_mark(&mut self, c: char) {
@@ -190,6 +191,12 @@ impl App {
                 self.last_dir_before_jump = Some(old);
             }
         } else if let Some(dir) = self.marks.get(&c).cloned() {
+            if !dir.exists() {
+                self.marks.remove(&c);
+                crate::marks::save_marks(&self.marks);
+                self.error = Some((format!("MARK '{}' PATH NO LONGER EXISTS", c), Instant::now()));
+                return;
+            }
             self.last_dir_before_jump = Some(self.pane().current_dir.clone());
             self.navigate_to(dir);
         } else {

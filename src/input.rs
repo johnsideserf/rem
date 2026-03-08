@@ -464,6 +464,7 @@ fn handle_theme_picker(app: &mut App, key: KeyEvent) {
             if let Some(throb) = &mut app.telemetry_throbber {
                 *throb = Throbber::new(ThrobberKind::Processing, new_palette.variant);
             }
+            crate::config::save_theme(new_palette.variant);
             app.show_theme_picker = false;
         }
         _ => {}
