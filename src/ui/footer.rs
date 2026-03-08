@@ -76,6 +76,7 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
                 ("enter", "open"),
                 ("e", "edit"),
                 ("/", "fuzzy"),
+                ("?", "search"),
                 ("v", "select"),
                 ("yy", "copy"),
                 ("dd", "cut"),
@@ -130,6 +131,14 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
             vec![
                 ("type", "name"),
                 ("enter", "create"),
+                ("esc", "cancel"),
+            ]
+        }
+        Mode::RecursiveSearch => {
+            vec![
+                ("type", "filter"),
+                ("\u{2191}\u{2193}", "move"),
+                ("enter", "go to"),
                 ("esc", "cancel"),
             ]
         }

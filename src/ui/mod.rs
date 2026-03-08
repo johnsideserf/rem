@@ -74,26 +74,31 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     header::render(f, app, outer[0]);
     breadcrumb::render(f, app, outer[1]);
 
-    // Right panel visibility: show if wide enough AND not Hidden
-    let show_right = area.width >= 100 && app.right_panel != RightPanel::Hidden;
-    if show_right {
-        let right_pct = app.sidebar_pct;
-        let left_pct = 100u16.saturating_sub(right_pct);
-        let body = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Percentage(left_pct),
-                Constraint::Percentage(right_pct),
-            ])
-            .split(outer[2]);
-        list::render(f, app, body[0]);
-        match app.right_panel {
-            RightPanel::Info => sidebar::render(f, app, body[1]),
-            RightPanel::Preview => preview::render(f, app, body[1]),
-            RightPanel::Hidden => unreachable!(),
-        }
+    // Recursive search takes over the full body area
+    if app.mode == crate::app::Mode::RecursiveSearch {
+        list::render_rsearch(f, app, outer[2]);
     } else {
-        list::render(f, app, outer[2]);
+        // Right panel visibility: show if wide enough AND not Hidden
+        let show_right = area.width >= 100 && app.right_panel != RightPanel::Hidden;
+        if show_right {
+            let right_pct = app.sidebar_pct;
+            let left_pct = 100u16.saturating_sub(right_pct);
+            let body = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Percentage(left_pct),
+                    Constraint::Percentage(right_pct),
+                ])
+                .split(outer[2]);
+            list::render(f, app, body[0]);
+            match app.right_panel {
+                RightPanel::Info => sidebar::render(f, app, body[1]),
+                RightPanel::Preview => preview::render(f, app, body[1]),
+                RightPanel::Hidden => unreachable!(),
+            }
+        } else {
+            list::render(f, app, outer[2]);
+        }
     }
 
     if app.show_telemetry {

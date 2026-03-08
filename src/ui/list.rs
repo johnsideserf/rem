@@ -4,7 +4,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
 
-use crate::app::{App, Mode, OpType, JUMP_KEYS, file_type_badge, format_size, icon_for};
+use crate::app::{App, Mode, OpType, JUMP_KEYS, file_type_badge, format_size, icon_for, FsEntry};
 
 /// Truncate string to `max_chars` characters, with ellipsis if needed, padded to `pad_to`.
 fn trunc_pad(s: &str, max_chars: usize, pad_to: usize) -> String {
@@ -305,4 +305,98 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
             f.render_widget(Paragraph::new(Line::from(span)), Rect::new(scroll_x, y, 1, 1));
         }
     }
+}
+
+/// Render the recursive search overlay (replaces the body area).
+pub fn render_rsearch(f: &mut Frame, app: &App, area: Rect) {
+    let pal = app.palette;
+    let width = area.width as usize;
+    let visible_height = area.height as usize;
+
+    if visible_height < 2 {
+        return;
+    }
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Search input bar
+    let cursor_char = if app.blink_on { "\u{258b}" } else { " " };
+    let total_scanned = app.rsearch_paths.len();
+    let match_count = app.rsearch_results.len();
+    let right_info = format!("[{}/{} matches]", match_count, total_scanned);
+
+    let input_line = Line::from(vec![
+        Span::styled(" [", Style::default().fg(pal.border_hot).bg(pal.surface)),
+        Span::styled("?", Style::default().fg(pal.text_hot).bg(pal.surface)),
+        Span::styled("] ", Style::default().fg(pal.border_hot).bg(pal.surface)),
+        Span::styled(app.rsearch_query.clone(), Style::default().fg(pal.text_hot).bg(pal.surface)),
+        Span::styled(cursor_char, Style::default().fg(pal.text_hot).bg(pal.surface)),
+        Span::styled(
+            " ".repeat(width.saturating_sub(5 + app.rsearch_query.len() + 1 + right_info.len())),
+            Style::default().bg(pal.surface),
+        ),
+        Span::styled(right_info, Style::default().fg(pal.text_dim).bg(pal.surface)),
+    ]);
+    lines.push(input_line);
+
+    // Results
+    let results_height = visible_height - 1;
+    let start = app.rsearch_scroll;
+    let end = (start + results_height).min(app.rsearch_results.len());
+
+    for vi in start..end {
+        let (idx, _score) = app.rsearch_results[vi];
+        let rel_path = &app.rsearch_paths[idx];
+        let is_cursor = vi == app.rsearch_cursor;
+        let row_bg = if is_cursor { pal.surface } else { pal.bg };
+        let text_color = if is_cursor { pal.text_hot } else { pal.text_dim };
+
+        let display = rel_path.to_string_lossy();
+
+        // Build a fake FsEntry to get the icon
+        let is_dir = rel_path.to_string_lossy().ends_with('/') ||
+            app.pane().current_dir.join(rel_path).is_dir();
+        let name = rel_path.file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let fake_entry = FsEntry {
+            name,
+            path: rel_path.to_path_buf(),
+            is_dir,
+            size: None,
+            modified: None,
+        };
+        let icon = icon_for(&fake_entry);
+
+        let indicator = if is_cursor { "\u{25b6}" } else { " " };
+        let max_path = width.saturating_sub(4); // indicator + icon + space + padding
+
+        let path_display = if display.chars().count() > max_path {
+            let t: String = display.chars().take(max_path.saturating_sub(1)).collect();
+            format!("{}\u{2026}", t)
+        } else {
+            format!("{:<width$}", display, width = max_path)
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled(indicator, Style::default().fg(pal.text_hot).bg(row_bg)),
+            Span::styled(format!("{} ", icon), Style::default().fg(text_color).bg(row_bg)),
+            Span::styled(path_display, Style::default().fg(text_color).bg(row_bg)),
+        ]));
+    }
+
+    // Pad remaining
+    while lines.len() < visible_height {
+        lines.push(Line::from(Span::styled(
+            " ".repeat(width),
+            Style::default().bg(pal.bg),
+        )));
+    }
+
+    let block = Block::default()
+        .borders(Borders::NONE)
+        .style(Style::default().bg(pal.bg));
+
+    let paragraph = Paragraph::new(lines).block(block);
+    f.render_widget(paragraph, area);
 }

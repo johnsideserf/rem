@@ -33,6 +33,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         Mode::WaitingForYank => handle_waiting_yank(app, key),
         Mode::WaitingForCut => handle_waiting_cut(app, key),
         Mode::WaitingForDeleteMark => handle_delete_mark(app, key),
+        Mode::RecursiveSearch => handle_rsearch(app, key),
     }
 }
 
@@ -87,6 +88,10 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
             app.mode = Mode::FuzzySearch;
             app.pane_mut().fuzzy_query.clear();
             app.rebuild_filtered();
+        }
+        (KeyModifiers::SHIFT, KeyCode::Char('?')) => {
+            app.rsearch_walk();
+            app.mode = Mode::RecursiveSearch;
         }
         (KeyModifiers::NONE, KeyCode::Char(' ')) => {
             app.mode = Mode::JumpKey;
@@ -496,6 +501,48 @@ fn handle_theme_picker(app: &mut App, key: KeyEvent) {
             }
             crate::config::save_theme(new_palette.variant);
             app.show_theme_picker = false;
+        }
+        _ => {}
+    }
+}
+
+fn handle_rsearch(app: &mut App, key: KeyEvent) {
+    match (key.modifiers, key.code) {
+        (_, KeyCode::Esc) => {
+            app.mode = Mode::Normal;
+        }
+        (_, KeyCode::Enter) => {
+            app.rsearch_confirm();
+        }
+        (_, KeyCode::Down) | (KeyModifiers::CONTROL, KeyCode::Char('n')) => {
+            if app.rsearch_cursor + 1 < app.rsearch_results.len() {
+                app.rsearch_cursor += 1;
+                // Scroll
+                let vh = app.pane().viewport_height.saturating_sub(2);
+                if app.rsearch_cursor >= app.rsearch_scroll + vh {
+                    app.rsearch_scroll = app.rsearch_cursor - vh + 1;
+                }
+            }
+        }
+        (_, KeyCode::Up) | (KeyModifiers::CONTROL, KeyCode::Char('p')) => {
+            if app.rsearch_cursor > 0 {
+                app.rsearch_cursor -= 1;
+                if app.rsearch_cursor < app.rsearch_scroll {
+                    app.rsearch_scroll = app.rsearch_cursor;
+                }
+            }
+        }
+        (_, KeyCode::Backspace) => {
+            app.rsearch_query.pop();
+            app.rsearch_filter();
+        }
+        (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
+            app.rsearch_query.clear();
+            app.rsearch_filter();
+        }
+        (KeyModifiers::NONE, KeyCode::Char(c)) => {
+            app.rsearch_query.push(c);
+            app.rsearch_filter();
         }
         _ => {}
     }

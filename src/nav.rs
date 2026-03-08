@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use crate::app::{App, FsEntry, PaneState, SortMode};
+use crate::app::{App, FsEntry, Mode, PaneState, SortMode};
 
 impl App {
     pub fn load_entries(&mut self) {
@@ -229,6 +229,105 @@ impl App {
         } else {
             self.error = Some((format!("MARK '{}' NOT SET", c), Instant::now()));
         }
+    }
+    /// Walk the current directory tree and populate rsearch_paths.
+    pub fn rsearch_walk(&mut self) {
+        use ignore::WalkBuilder;
+
+        let base = self.pane().current_dir.clone();
+        self.rsearch_paths.clear();
+        self.rsearch_results.clear();
+        self.rsearch_query.clear();
+        self.rsearch_cursor = 0;
+        self.rsearch_scroll = 0;
+
+        let walker = WalkBuilder::new(&base)
+            .hidden(!self.show_hidden)
+            .git_ignore(true)
+            .git_global(false)
+            .git_exclude(true)
+            .max_depth(Some(12))
+            .build();
+
+        let mut count = 0usize;
+        const MAX_ENTRIES: usize = 50_000;
+
+        for entry in walker.into_iter().flatten() {
+            if count >= MAX_ENTRIES {
+                break;
+            }
+            let path = entry.into_path();
+            if path == base {
+                continue;
+            }
+            if let Ok(rel) = path.strip_prefix(&base) {
+                self.rsearch_paths.push(rel.to_path_buf());
+                count += 1;
+            }
+        }
+
+        // Show all results initially
+        self.rsearch_results = (0..self.rsearch_paths.len())
+            .map(|i| (i, 0))
+            .collect();
+    }
+
+    /// Re-filter rsearch results based on current query.
+    pub fn rsearch_filter(&mut self) {
+        use fuzzy_matcher::FuzzyMatcher;
+        use fuzzy_matcher::skim::SkimMatcherV2;
+
+        self.rsearch_cursor = 0;
+        self.rsearch_scroll = 0;
+
+        if self.rsearch_query.is_empty() {
+            self.rsearch_results = (0..self.rsearch_paths.len())
+                .map(|i| (i, 0))
+                .collect();
+            return;
+        }
+
+        let matcher = SkimMatcherV2::default();
+        let mut scored: Vec<(usize, i64)> = self.rsearch_paths.iter().enumerate()
+            .filter_map(|(i, p)| {
+                let s = p.to_string_lossy();
+                matcher.fuzzy_match(&s, &self.rsearch_query)
+                    .map(|score| (i, score))
+            })
+            .collect();
+
+        scored.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // Cap results for rendering performance
+        scored.truncate(1000);
+        self.rsearch_results = scored;
+    }
+
+    /// Navigate to the selected recursive search result.
+    pub fn rsearch_confirm(&mut self) {
+        if let Some(&(idx, _)) = self.rsearch_results.get(self.rsearch_cursor) {
+            let rel = &self.rsearch_paths[idx];
+            let full = self.pane().current_dir.join(rel);
+            if full.is_dir() {
+                self.navigate_to(full);
+            } else if let Some(parent) = full.parent() {
+                let file_name = full.file_name()
+                    .map(|n| n.to_string_lossy().into_owned());
+                self.navigate_to(parent.to_path_buf());
+                // Try to place cursor on the file
+                if let Some(name) = file_name {
+                    let pane = self.pane_mut();
+                    for (vi, &ei) in pane.filtered_indices.iter().enumerate() {
+                        if pane.entries[ei].name == name {
+                            pane.cursor = vi;
+                            ensure_visible(pane);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        self.mode = Mode::Normal;
     }
 }
 

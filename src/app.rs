@@ -39,6 +39,7 @@ pub enum Mode {
     WaitingForYank,       // first 'y' pressed, awaiting second 'y'
     WaitingForCut,        // first 'd' pressed, awaiting second 'd'
     WaitingForDeleteMark, // 'M' pressed, awaiting key to delete mark
+    RecursiveSearch,
 }
 
 #[derive(PartialEq, Eq, Clone)]
@@ -208,6 +209,12 @@ pub struct App {
     pub theme_picker_cursor: usize,
     pub open_request: Option<OpenRequest>,
     pub sort_mode: SortMode,
+    // Recursive search state
+    pub rsearch_query: String,
+    pub rsearch_paths: Vec<PathBuf>,          // all walked paths (relative)
+    pub rsearch_results: Vec<(usize, i64)>,   // (index into rsearch_paths, score)
+    pub rsearch_cursor: usize,
+    pub rsearch_scroll: usize,
 }
 
 impl App {
@@ -244,6 +251,11 @@ impl App {
             theme_picker_cursor: 0,
             open_request: None,
             sort_mode: SortMode::default(),
+            rsearch_query: String::new(),
+            rsearch_paths: Vec::new(),
+            rsearch_results: Vec::new(),
+            rsearch_cursor: 0,
+            rsearch_scroll: 0,
         };
         app.load_entries();
         app
