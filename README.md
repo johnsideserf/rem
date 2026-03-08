@@ -1,6 +1,8 @@
 # rem
 
-A terminal file navigator with a Weyland-Yutani corporate aesthetic. Built in Rust with [ratatui](https://ratatui.rs).
+> **RESOURCE EXTRACTION MANAGER** -- Weyland-Yutani Corp. Standard-Issue File Navigation Terminal
+>
+> *Classified under WY-DOC-4789. Unauthorized access is a violation of ICC corporate law.*
 
 ```
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -18,107 +20,113 @@ A terminal file navigator with a Weyland-Yutani corporate aesthetic. Built in Ru
                        BUILDING  BETTER  WORLDS
 ```
 
+A corporate-grade terminal file navigator built in Rust with [ratatui](https://ratatui.rs). Designed for operatives who need to manage filesystem assets efficiently in hostile or low-bandwidth environments. Three CRT display profiles are provided to match your installation's hardware specifications.
+
 ## Screenshots
 
 ![Boot sequence](screenshots/boot-amber.gif)
 
-### Phosphor Green
+### Phosphor Green -- Standard Issue
 ![Phosphor Green theme](screenshots/green.png)
 
-### Amber
+### Amber -- Corporate Mainframe
 ![Amber theme](screenshots/amber.png)
 
-### Degraded Cyan (with theme picker)
+### Degraded Cyan -- Field Unit (with theme picker)
 ![Degraded Cyan theme with theme picker](screenshots/cyan-w-theme-picker.png)
 
-## Features
+## Operator Manual
 
-- **Vim-style navigation** -- `hjkl` movement, `gg`/`G` jump to top/bottom, `/` fuzzy search
-- **Dual-pane mode** -- `Tab` to toggle, navigate two directories side by side
-- **Visual selection** -- `v` to enter visual mode, bulk select with `j`/`k`
-- **File operations** -- `yy` copy, `dd` cut, `p` paste, `D` delete (with confirmation)
-- **Fuzzy search** -- `/` to filter the current directory with fuzzy matching
-- **Jump keys** -- `f` to show single-key jump labels on each entry
-- **Bookmarks** -- `m` + key to set, `'` + key to jump
-- **File preview** -- side panel with scrollable file contents
-- **Rename & create** -- `r` to rename, `a` to create file, `A` to create directory
-- **System telemetry** -- `` ` `` to toggle CPU, RAM, disk, and network stats
-- **Theme picker** -- `t` to open, choose between three CRT-inspired palettes
-- **Resizable sidebar** -- `[` / `]` to shrink/grow the preview panel
-- **Boot sequence** -- animated Weyland-Yutani corporate splash screen
+### Terminal Capabilities
 
-## Themes
+- **Navigation** -- vim-keyed traversal (`hjkl`), jump-to-top/bottom (`gg`/`G`), fuzzy asset search (`/`)
+- **Dual-pane operations** -- `Tab` to deploy split-view for cross-directory transfers
+- **Visual targeting** -- `v` to enter selection mode, mark multiple assets with `j`/`k`
+- **Asset management** -- `yy` copy, `dd` cut, `p` paste, `D` purge (requires confirmation)
+- **Fuzzy search** -- `/` to locate assets in the current directory via pattern matching
+- **Jump keys** -- `f` to display single-key target labels on all visible entries
+- **Navigation marks** -- `m` + key to designate a waypoint, `'` + key to return
+- **Asset preview** -- side panel with scrollable file contents
+- **Rename & provision** -- `r` to rename, `a` to create file, `A` to create directory
+- **System telemetry** -- `` ` `` to monitor CPU, RAM, disk, and network diagnostics
+- **Display profiles** -- `t` to open the theme selector
+- **Viewport adjustment** -- `[` / `]` to resize the preview panel
+- **Boot sequence** -- corporate authentication splash with animated WY mark
 
-| Theme | Description |
-|-------|-------------|
-| **Phosphor Green** | Classic CRT terminal |
-| **Amber** | Corporate mainframe |
-| **Degraded Cyan** | Field unit signal |
+### Display Profiles
 
-## Keybindings
+| Profile | Designation | Deployment |
+|---------|-------------|------------|
+| **PHOSPHOR GREEN** | WY-CRT-01 | Standard colony terminals |
+| **AMBER** | WY-CRT-02 | Corporate mainframe consoles |
+| **DEGRADED CYAN** | WY-CRT-03 | Field units, survey equipment |
 
-### Navigation
-| Key | Action |
-|-----|--------|
-| `h` / `Left` | Go to parent directory |
-| `l` / `Right` / `Enter` | Open directory |
-| `j` / `Down` | Move cursor down |
-| `k` / `Up` | Move cursor up |
+### Command Reference
+
+#### Navigation
+| Input | Function |
+|-------|----------|
+| `h` / `Left` | Ascend to parent directory |
+| `l` / `Right` / `Enter` | Enter directory |
+| `j` / `Down` | Cursor down |
+| `k` / `Up` | Cursor up |
 | `gg` | Jump to first entry |
 | `G` | Jump to last entry |
 | `H` | Navigate back in history |
 | `L` | Navigate forward in history |
-| `-` | Go to parent directory |
+| `-` | Ascend to parent directory |
 
-### Search & Jump
-| Key | Action |
-|-----|--------|
+#### Search & Targeting
+| Input | Function |
+|-------|----------|
 | `/` | Fuzzy search current directory |
-| `f` | Show jump key labels |
-| `m` + key | Set bookmark |
-| `'` + key | Jump to bookmark |
+| `f` | Deploy jump key overlay |
+| `m` + key | Set navigation mark |
+| `'` + key | Jump to navigation mark |
 
-### File Operations
-| Key | Action |
-|-----|--------|
-| `yy` | Copy (yank) current file or selection |
-| `dd` | Cut current file or selection |
-| `p` | Paste from buffer |
-| `D` | Delete selection (with confirmation) |
-| `r` | Rename current file |
-| `a` | Create new file |
-| `A` | Create new directory |
+#### Asset Operations
+| Input | Function |
+|-------|----------|
+| `yy` | Copy current asset or selection |
+| `dd` | Cut current asset or selection |
+| `p` | Paste from operations buffer |
+| `D` | Purge selection (confirmation required) |
+| `r` | Rename asset |
+| `a` | Provision new file |
+| `A` | Provision new directory |
 
-### Selection
-| Key | Action |
-|-----|--------|
-| `v` | Toggle visual selection mode |
+#### Selection
+| Input | Function |
+|-------|----------|
+| `v` | Toggle visual targeting mode |
 | `u` | Clear all marks |
 
-### Panels & Display
-| Key | Action |
-|-----|--------|
+#### Display & Panels
+| Input | Function |
+|-------|----------|
 | `Tab` | Toggle dual-pane / switch active pane |
 | `i` | Cycle right panel (info / preview / hidden) |
-| `[` | Shrink sidebar |
-| `]` | Grow sidebar |
-| `t` | Open theme picker |
-| `` ` `` | Toggle telemetry panel |
-| `.` | Toggle hidden files |
+| `[` | Contract sidebar |
+| `]` | Expand sidebar |
+| `t` | Open display profile selector |
+| `` ` `` | Toggle telemetry readout |
+| `.` | Toggle hidden assets |
 
-### General
-| Key | Action |
-|-----|--------|
-| `q` | Quit |
-| `Esc` | Cancel current mode |
+#### General
+| Input | Function |
+|-------|----------|
+| `q` | Terminate session |
+| `Esc` | Abort current operation |
 
-## Install
+## Deployment
+
+### Quick install
 
 ```sh
 cargo install --path .
 ```
 
-## Build from source
+### Build from source
 
 ```sh
 git clone https://github.com/johnsideserf/rem.git
@@ -127,12 +135,14 @@ cargo build --release
 ./target/release/rem
 ```
 
-## Requirements
+## System Requirements
 
 - Rust 2024 edition (1.85+)
-- A terminal with Unicode support
-- Recommended: a [Nerd Font](https://www.nerdfonts.com/) for best glyph rendering
+- Terminal with Unicode rendering capability
+- Recommended: a [Nerd Font](https://www.nerdfonts.com/) for optimal glyph display
 
-## License
+---
 
-MIT
+*Weyland-Yutani Corporation. Building Better Worlds.*
+
+*This software is provided under the MIT license. The Company assumes no liability for data loss, xenomorph encounters, or crew expenditure resulting from use of this terminal.*
