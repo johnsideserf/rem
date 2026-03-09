@@ -8,6 +8,7 @@ use crate::app::App;
 
 pub fn should_show(app: &App) -> bool {
     app.bg_operation.is_some() || app.op_feedback.is_some()
+        || app.hash_op.is_some() || app.disk_scan.is_some()
 }
 
 pub fn render(f: &mut Frame, app: &App, area: Rect) {
@@ -90,6 +91,78 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
             ));
         }
         s
+    } else if let Some(hop) = &app.hash_op {
+        // Hash in progress (#20)
+        let throbber_char = hop.throbber.frame();
+        let pct = (hop.progress * 100.0) as u64;
+        let filename = hop.path.file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let file_display = if filename.len() > 20 {
+            format!("{}\u{2026}", &filename[..19])
+        } else {
+            filename
+        };
+
+        let bar_width = 20usize.min(width.saturating_sub(40));
+        let filled = (pct as usize * bar_width / 100).min(bar_width);
+        let empty = bar_width.saturating_sub(filled);
+        let bar = format!("{}{}", app.symbols.bar_fill.repeat(filled), app.symbols.bar_empty.repeat(empty));
+
+        vec![
+            Span::styled(
+                format!(" {} ", throbber_char),
+                Style::default().fg(pal.text_hot).bg(pal.surface),
+            ),
+            Span::styled(
+                "INTEGRITY CHECK",
+                Style::default().fg(pal.text_mid).bg(pal.surface),
+            ),
+            Span::styled(
+                format!("  {}  ", file_display),
+                Style::default().fg(pal.text_dim).bg(pal.surface),
+            ),
+            Span::styled(
+                bar,
+                Style::default().fg(pal.text_hot).bg(pal.surface),
+            ),
+            Span::styled(
+                format!(" {}%", pct),
+                Style::default().fg(pal.text_mid).bg(pal.surface),
+            ),
+        ]
+    } else if let Some(ds) = &app.disk_scan {
+        // Disk scan in progress (#21)
+        let throbber_char = ds.throbber.frame();
+        let bar_width = 16usize.min(width.saturating_sub(40));
+        // Indeterminate bar: sliding block
+        let pos = (ds.nodes as usize / 10) % bar_width;
+        let bar: String = (0..bar_width).map(|i| {
+            if (i as i32 - pos as i32).unsigned_abs() as usize <= 2 {
+                app.symbols.bar_fill
+            } else {
+                app.symbols.bar_empty
+            }
+        }).collect();
+
+        vec![
+            Span::styled(
+                format!(" {} ", throbber_char),
+                Style::default().fg(pal.text_hot).bg(pal.surface),
+            ),
+            Span::styled(
+                "SCANNING ALLOCATION...",
+                Style::default().fg(pal.text_mid).bg(pal.surface),
+            ),
+            Span::styled(
+                format!("  {} NODES  ", ds.nodes),
+                Style::default().fg(pal.text_dim).bg(pal.surface),
+            ),
+            Span::styled(
+                bar,
+                Style::default().fg(pal.text_hot).bg(pal.surface),
+            ),
+        ]
     } else if let Some(fb) = &app.op_feedback {
         // Feedback: success/error message
         let color = if fb.success { pal.text_hot } else { pal.warn };

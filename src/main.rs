@@ -1,4 +1,5 @@
 mod app;
+mod archive;
 mod config;
 mod highlight;
 mod input;
@@ -88,6 +89,9 @@ fn run_loop(
                 if key.kind != KeyEventKind::Press {
                     continue;
                 }
+                // Reset idle timer on any input (#17)
+                app.last_input = std::time::Instant::now();
+                app.idle_active = false;
                 input::handle_key(app, key);
 
                 if app.should_quit {

@@ -45,6 +45,46 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
 }
 
 fn handle_normal(app: &mut App, key: KeyEvent) {
+    // Archive mode: restrict to navigation-only keys (#19)
+    if app.archive.is_some() {
+        match (key.modifiers, key.code) {
+            (KeyModifiers::NONE, KeyCode::Char('q')) | (KeyModifiers::NONE, KeyCode::Esc) => {
+                app.exit_archive();
+            }
+            (KeyModifiers::NONE, KeyCode::Char('j')) | (KeyModifiers::NONE, KeyCode::Down) => {
+                app.cursor_down();
+            }
+            (KeyModifiers::NONE, KeyCode::Char('k')) | (KeyModifiers::NONE, KeyCode::Up) => {
+                app.cursor_up();
+            }
+            (KeyModifiers::NONE, KeyCode::Char('l'))
+            | (KeyModifiers::NONE, KeyCode::Right)
+            | (KeyModifiers::NONE, KeyCode::Enter) => {
+                app.enter_selected();
+            }
+            (KeyModifiers::NONE, KeyCode::Char('h'))
+            | (KeyModifiers::NONE, KeyCode::Left) => {
+                app.go_parent();
+            }
+            (KeyModifiers::NONE, KeyCode::Char('g')) => {
+                app.mode = Mode::WaitingForG;
+            }
+            (KeyModifiers::SHIFT, KeyCode::Char('G')) => {
+                app.jump_bottom();
+            }
+            (KeyModifiers::NONE, KeyCode::Char('/')) => {
+                app.mode = Mode::FuzzySearch;
+                app.pane_mut().fuzzy_query.clear();
+                app.rebuild_filtered();
+            }
+            (KeyModifiers::NONE, KeyCode::Char(' ')) => {
+                app.mode = Mode::JumpKey;
+            }
+            _ => {}
+        }
+        return;
+    }
+
     match (key.modifiers, key.code) {
         (KeyModifiers::NONE, KeyCode::Char('q')) | (KeyModifiers::NONE, KeyCode::Esc) => {
             app.should_quit = true;
@@ -216,6 +256,15 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
         }
         (KeyModifiers::NONE, KeyCode::Char(']')) => {
             app.sidebar_pct = (app.sidebar_pct + 3).min(60);
+        }
+        // SHA-256 hash (#20)
+        (KeyModifiers::SHIFT, KeyCode::Char('#'))
+        | (KeyModifiers::NONE, KeyCode::Char('#')) => {
+            app.hash_selected();
+        }
+        // Disk usage scan (#21)
+        (KeyModifiers::SHIFT, KeyCode::Char('W')) => {
+            app.scan_disk_usage();
         }
         // Theme picker
         (KeyModifiers::NONE, KeyCode::Char('t')) => {
@@ -522,6 +571,7 @@ fn handle_theme_picker(app: &mut App, key: KeyEvent) {
                     app.symbols.heartbeat_frames,
                     ThrobberKind::Heartbeat,
                 );
+                app.io_throbber = Throbber::new(ThrobberKind::DataStream, new_palette.variant);
                 if let Some(throb) = &mut app.telemetry_throbber {
                     *throb = Throbber::from_frames(
                         app.symbols.throbber_frames,

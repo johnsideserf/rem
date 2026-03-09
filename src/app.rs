@@ -13,6 +13,7 @@ pub enum RightPanel {
     Info,
     Preview,
     Hidden,
+    DiskUsage,
 }
 
 impl RightPanel {
@@ -21,6 +22,7 @@ impl RightPanel {
             Self::Info => Self::Preview,
             Self::Preview => Self::Hidden,
             Self::Hidden => Self::Info,
+            Self::DiskUsage => Self::Info,
         }
     }
 }
@@ -347,6 +349,70 @@ fn char_to_byte(s: &str, char_idx: usize) -> usize {
         .unwrap_or(s.len())
 }
 
+/// Message from SHA-256 hash background thread (#20).
+pub enum HashMessage {
+    Progress(f64),
+    Complete(String),
+    Error(String),
+}
+
+/// Active hash computation.
+pub struct HashOp {
+    pub path: PathBuf,
+    pub progress: f64,
+    pub throbber: Throbber,
+    pub receiver: mpsc::Receiver<HashMessage>,
+}
+
+/// A single entry in a disk usage scan result (#21).
+pub struct DiskUsageEntry {
+    pub name: String,
+    pub size: u64,
+    pub is_dir: bool,
+}
+
+/// Completed disk usage scan data.
+#[allow(dead_code)]
+pub struct DiskUsageData {
+    pub path: PathBuf,
+    pub entries: Vec<DiskUsageEntry>,
+    pub total_size: u64,
+    pub total_items: u64,
+}
+
+/// Message from disk usage scan background thread.
+#[allow(dead_code)]
+pub enum DiskScanMessage {
+    Progress(u64),
+    Complete(DiskUsageData),
+    Error(String),
+}
+
+/// Active disk scan operation.
+#[allow(dead_code)]
+pub struct DiskScanOp {
+    pub dir_name: String,
+    pub nodes: u64,
+    pub throbber: Throbber,
+    pub receiver: mpsc::Receiver<DiskScanMessage>,
+}
+
+/// An entry inside a zip archive (#19).
+#[derive(Clone)]
+pub struct ArchiveEntry {
+    pub name: String,
+    pub full_path: String,
+    pub is_dir: bool,
+    pub size: u64,
+}
+
+/// State for browsing inside an archive.
+pub struct ArchiveContext {
+    pub archive_path: PathBuf,
+    pub internal_dir: String,
+    pub all_entries: Vec<ArchiveEntry>,
+}
+
 pub struct FsEntry {
     pub name: String,
     pub path: PathBuf,
@@ -491,6 +557,24 @@ pub struct App {
     pub rsearch_results: Vec<(usize, i64)>,   // (index into rsearch_paths, score)
     pub rsearch_cursor: usize,
     pub rsearch_scroll: usize,
+    // Border pulse (#18)
+    pub border_pulse_tick: u32,
+    // I/O activity throbber (#16)
+    pub io_throbber: Throbber,
+    pub io_flash_tick: u8,
+    // Idle screen (#17)
+    pub last_input: Instant,
+    pub idle_active: bool,
+    // CRT glitch for cyan (#15)
+    pub glitch_tick: u32,
+    // SHA-256 hash (#20)
+    pub last_hash: Option<(PathBuf, String)>,
+    pub hash_op: Option<HashOp>,
+    // Disk usage (#21)
+    pub disk_usage: Option<DiskUsageData>,
+    pub disk_scan: Option<DiskScanOp>,
+    // Archive browsing (#19)
+    pub archive: Option<ArchiveContext>,
 }
 
 impl App {
@@ -542,6 +626,17 @@ impl App {
             rsearch_results: Vec::new(),
             rsearch_cursor: 0,
             rsearch_scroll: 0,
+            border_pulse_tick: 0,
+            io_throbber: Throbber::new(ThrobberKind::DataStream, palette.variant),
+            io_flash_tick: 0,
+            last_input: Instant::now(),
+            idle_active: false,
+            glitch_tick: 0,
+            last_hash: None,
+            hash_op: None,
+            disk_usage: None,
+            disk_scan: None,
+            archive: None,
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);
@@ -631,6 +726,56 @@ impl App {
             throb.tick();
         }
         self.heartbeat.tick();
+        // Border pulse (#18)
+        self.border_pulse_tick = self.border_pulse_tick.wrapping_add(1);
+        // I/O flash countdown (#16)
+        if self.io_flash_tick > 0 {
+            self.io_throbber.tick();
+            self.io_flash_tick = self.io_flash_tick.saturating_sub(1);
+        }
+        // Idle detection (#17)
+        self.idle_active = now.duration_since(self.last_input).as_secs() >= 45;
+        // CRT glitch (#15)
+        self.glitch_tick = self.glitch_tick.wrapping_add(1);
+        // Hash progress polling (#20)
+        let mut hash_done = false;
+        if let Some(hop) = &mut self.hash_op {
+            hop.throbber.tick();
+            while let Ok(msg) = hop.receiver.try_recv() {
+                match msg {
+                    HashMessage::Progress(p) => hop.progress = p,
+                    HashMessage::Complete(hash) => {
+                        self.last_hash = Some((hop.path.clone(), hash));
+                        hash_done = true;
+                    }
+                    HashMessage::Error(e) => {
+                        self.error = Some((format!("HASH FAILED: {}", e), Instant::now()));
+                        hash_done = true;
+                    }
+                }
+            }
+        }
+        if hash_done { self.hash_op = None; }
+        // Disk scan polling (#21)
+        let mut scan_done = false;
+        if let Some(ds) = &mut self.disk_scan {
+            ds.throbber.tick();
+            while let Ok(msg) = ds.receiver.try_recv() {
+                match msg {
+                    DiskScanMessage::Progress(n) => ds.nodes = n,
+                    DiskScanMessage::Complete(data) => {
+                        self.disk_usage = Some(data);
+                        self.right_panel = RightPanel::DiskUsage;
+                        scan_done = true;
+                    }
+                    DiskScanMessage::Error(e) => {
+                        self.error = Some((format!("SCAN FAILED: {}", e), Instant::now()));
+                        scan_done = true;
+                    }
+                }
+            }
+        }
+        if scan_done { self.disk_scan = None; }
         // Directory transition animation
         if self.anim_frame > 0 && now.duration_since(self.anim_tick).as_millis() >= 70 {
             self.anim_frame += 1;
@@ -640,6 +785,91 @@ impl App {
             }
         }
     }
+
+    /// Compute the pulsed border color for the active pane (#18).
+    pub fn pulsed_border(&self) -> ratatui::style::Color {
+        use ratatui::style::Color;
+        let phase = (self.border_pulse_tick % 20) as f32 / 20.0;
+        let t = (phase * std::f32::consts::TAU).sin() * 0.5 + 0.5;
+        match (self.palette.border_mid, self.palette.border_hot) {
+            (Color::Rgb(mr, mg, mb), Color::Rgb(hr, hg, hb)) => Color::Rgb(
+                (mr as f32 + (hr as f32 - mr as f32) * t) as u8,
+                (mg as f32 + (hg as f32 - mg as f32) * t) as u8,
+                (mb as f32 + (hb as f32 - mb as f32) * t) as u8,
+            ),
+            _ => self.palette.border_hot,
+        }
+    }
+
+    /// Pseudo-random value for CRT glitch effects (#15).
+    pub fn glitch_rand(&self, index: u32) -> u32 {
+        let mut h = self.glitch_tick.wrapping_mul(2654435761).wrapping_add(index);
+        h ^= h >> 16;
+        h = h.wrapping_mul(0x45d9f3b);
+        h ^= h >> 16;
+        h
+    }
+
+    /// Populate pane entries from archive context (#19).
+    pub fn populate_archive_entries(&mut self) {
+        if let Some(archive) = &self.archive {
+            let visible = archive_ls(&archive.all_entries, &archive.internal_dir);
+            let pane = self.pane_mut();
+            pane.entries = visible.iter().map(|ae| FsEntry {
+                name: ae.name.clone(),
+                path: PathBuf::from(&ae.full_path),
+                is_dir: ae.is_dir,
+                size: if ae.is_dir { None } else { Some(ae.size) },
+                modified: None,
+            }).collect();
+            pane.cursor = 0;
+            pane.scroll_offset = 0;
+            pane.fuzzy_query.clear();
+        }
+        self.rebuild_filtered();
+    }
+}
+
+/// Extract visible entries for a given directory within an archive.
+fn archive_ls(entries: &[ArchiveEntry], dir: &str) -> Vec<ArchiveEntry> {
+    let mut result = Vec::new();
+    let mut seen_dirs = std::collections::HashSet::new();
+
+    for entry in entries {
+        let path = &entry.full_path;
+        if !path.starts_with(dir) {
+            continue;
+        }
+        let relative = &path[dir.len()..];
+        if relative.is_empty() {
+            continue;
+        }
+
+        if let Some(slash_pos) = relative.find('/') {
+            let subdir_name = &relative[..slash_pos];
+            if !subdir_name.is_empty() && seen_dirs.insert(subdir_name.to_string()) {
+                result.push(ArchiveEntry {
+                    name: subdir_name.to_string(),
+                    full_path: format!("{}{}/", dir, subdir_name),
+                    is_dir: true,
+                    size: 0,
+                });
+            }
+        } else {
+            result.push(ArchiveEntry {
+                name: relative.to_string(),
+                full_path: entry.full_path.clone(),
+                is_dir: false,
+                size: entry.size,
+            });
+        }
+    }
+
+    result.sort_by(|a, b| {
+        b.is_dir.cmp(&a.is_dir)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+    result
 }
 
 pub const JUMP_KEYS: &[char] = &[

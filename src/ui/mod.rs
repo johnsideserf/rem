@@ -9,6 +9,7 @@ mod statusbar;
 mod telemetry;
 mod footer;
 pub mod theme_picker;
+mod disk_usage;
 
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout};
@@ -29,7 +30,8 @@ pub fn render(f: &mut Frame, app: &mut App) {
 
     // Update viewport height for scroll calculations
     let telemetry_height = if app.show_telemetry { telemetry_panel_height(app) } else { 0 };
-    app.pane_mut().viewport_height = area.height.saturating_sub(5 + telemetry_height as u16) as usize;
+    let footer_h = footer::required_height(app, area.width);
+    app.pane_mut().viewport_height = area.height.saturating_sub(4 + footer_h + telemetry_height as u16) as usize;
 
     if app.dual_pane && area.width >= 100 {
         render_dual(f, app, area);
@@ -59,6 +61,7 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     } else {
         0
     };
+    let footer_height = footer::required_height(app, area.width);
 
     let outer = Layout::default()
         .direction(Direction::Vertical)
@@ -68,7 +71,7 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
             Constraint::Min(3),               // body
             Constraint::Length(telem_height),  // telemetry (conditional)
             Constraint::Length(status_height), // status bar (conditional)
-            Constraint::Length(1),             // footer
+            Constraint::Length(footer_height), // footer (wraps)
         ])
         .split(area);
 
@@ -88,7 +91,7 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
         list::render_rsearch(f, app, outer[2]);
     } else {
         // Right panel visibility: show if wide enough AND not Hidden
-        let show_right = area.width >= 100 && app.right_panel != RightPanel::Hidden;
+        let show_right = area.width >= 100 && !matches!(app.right_panel, RightPanel::Hidden);
         if show_right {
             let right_pct = app.sidebar_pct;
             let left_pct = 100u16.saturating_sub(right_pct);
@@ -103,6 +106,7 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
             match app.right_panel {
                 RightPanel::Info => sidebar::render(f, app, body[1]),
                 RightPanel::Preview => preview::render(f, app, body[1]),
+                RightPanel::DiskUsage => disk_usage::render(f, app, body[1]),
                 RightPanel::Hidden => unreachable!(),
             }
         } else {
@@ -127,6 +131,16 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     if app.mode == crate::app::Mode::BulkRename {
         render_bulk_rename(f, app, area);
     }
+
+    // Idle overlay (#17)
+    if app.idle_active {
+        render_idle_overlay(f, app, area);
+    }
+
+    // CRT glitch effects for cyan palette (#15)
+    if matches!(app.palette.variant, crate::throbber::PaletteVariant::Cyan) {
+        render_cyan_glitch(f, app, area);
+    }
 }
 
 fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
@@ -138,6 +152,7 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     } else {
         0
     };
+    let footer_height = footer::required_height(app, area.width);
 
     let outer = Layout::default()
         .direction(Direction::Vertical)
@@ -147,7 +162,7 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
             Constraint::Min(3),               // body (both panes)
             Constraint::Length(telem_height),  // telemetry
             Constraint::Length(status_height), // status bar
-            Constraint::Length(1),             // footer
+            Constraint::Length(footer_height), // footer (wraps)
         ])
         .split(area);
 
@@ -191,7 +206,8 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
 
     list::render_pane(f, app, 0, body_halves[0]);
 
-    // Render a subtle border between panes
+    // Render a pulsing border between panes (#18)
+    let pulsed = app.pulsed_border();
     let border_area = ratatui::layout::Rect::new(
         body_halves[1].x, body_halves[1].y, 1, body_halves[1].height,
     );
@@ -200,7 +216,7 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
             ratatui::widgets::Paragraph::new(ratatui::text::Line::from(
                 ratatui::text::Span::styled(
                     "\u{2502}",
-                    Style::default().fg(pal.border_dim).bg(pal.bg),
+                    Style::default().fg(pulsed).bg(pal.bg),
                 ),
             )),
             ratatui::layout::Rect::new(border_area.x, border_area.y + row, 1, 1),
@@ -227,6 +243,16 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
 
     if app.mode == crate::app::Mode::BulkRename {
         render_bulk_rename(f, app, area);
+    }
+
+    // Idle overlay (#17)
+    if app.idle_active {
+        render_idle_overlay(f, app, area);
+    }
+
+    // CRT glitch effects for cyan palette (#15)
+    if matches!(app.palette.variant, crate::throbber::PaletteVariant::Cyan) {
+        render_cyan_glitch(f, app, area);
     }
 }
 
@@ -311,4 +337,136 @@ fn render_bulk_rename(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
 
     let paragraph = Paragraph::new(lines).block(block);
     f.render_widget(paragraph, popup);
+}
+
+/// Render the idle screen overlay with WY logo burn-in (#17).
+fn render_idle_overlay(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+    use ratatui::text::{Line, Span};
+    use ratatui::widgets::{Clear, Paragraph};
+
+    let pal = app.palette;
+    let logo = crate::logo::logo_for(pal.variant);
+
+    // Center the logo
+    let logo_h = logo.len() as u16;
+    let logo_w = logo.first().map(|l| l.len()).unwrap_or(0) as u16;
+    if area.width < logo_w + 4 || area.height < logo_h + 6 {
+        return;
+    }
+
+    let x = area.x + (area.width.saturating_sub(logo_w)) / 2;
+    let y = area.y + (area.height.saturating_sub(logo_h + 4)) / 2;
+
+    // Dim the entire background
+    let dim_area = area;
+    f.render_widget(Clear, dim_area);
+    f.render_widget(
+        Block::default().style(Style::default().bg(pal.bg)),
+        dim_area,
+    );
+
+    // Render logo with phosphor burn-in effect
+    let burn_color = match (pal.border_dim, pal.border_mid) {
+        (ratatui::style::Color::Rgb(dr, dg, db), ratatui::style::Color::Rgb(mr, mg, mb)) => {
+            // Subtle mid-brightness color
+            ratatui::style::Color::Rgb(
+                (dr as u16 + mr as u16 / 2).min(255) as u8,
+                (dg as u16 + mg as u16 / 2).min(255) as u8,
+                (db as u16 + mb as u16 / 2).min(255) as u8,
+            )
+        }
+        _ => pal.border_mid,
+    };
+    let dot_color = pal.border_dim;
+
+    for (row, line_str) in logo.iter().enumerate() {
+        let mut spans: Vec<Span> = Vec::new();
+        for ch in line_str.chars() {
+            let (c, color) = if ch == '@' {
+                ('\u{2588}', burn_color) // solid block
+            } else {
+                ('\u{00b7}', dot_color) // dot for gaps
+            };
+            spans.push(Span::styled(
+                c.to_string(),
+                Style::default().fg(color).bg(pal.bg),
+            ));
+        }
+        let logo_rect = ratatui::layout::Rect::new(x, y + row as u16, logo_w, 1);
+        f.render_widget(Paragraph::new(Line::from(spans)), logo_rect);
+    }
+
+    // AWAITING INPUT message below logo
+    let msg = "AWAITING INPUT...";
+    let throbber = app.heartbeat.frame();
+    let msg_line = Line::from(vec![
+        Span::styled(
+            format!("{} {}", throbber, msg),
+            Style::default().fg(pal.text_dim).bg(pal.bg),
+        ),
+    ]);
+    let msg_w = (msg.len() + 3) as u16;
+    let msg_x = area.x + (area.width.saturating_sub(msg_w)) / 2;
+    let msg_y = y + logo_h + 2;
+    if msg_y < area.y + area.height {
+        f.render_widget(
+            Paragraph::new(msg_line),
+            ratatui::layout::Rect::new(msg_x, msg_y, msg_w, 1),
+        );
+    }
+}
+
+/// Render CRT signal degradation effects for cyan palette (#15).
+fn render_cyan_glitch(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+    use ratatui::text::{Line, Span};
+    use ratatui::widgets::Paragraph;
+
+    let pal = app.palette;
+    let tick = app.glitch_tick;
+
+    const JUNK_CHARS: &[char] = &[
+        '\u{2591}', '\u{2592}', '\u{2593}', '\u{2580}', '\u{2584}',
+        '\u{2840}', '\u{28ff}', '\u{254c}', '\u{2502}', '\u{2500}',
+    ];
+
+    // Character corruption: 1-2 random chars on screen edges, every ~15 ticks
+    if tick % 17 == 3 {
+        let r1 = app.glitch_rand(0);
+        let r2 = app.glitch_rand(1);
+        let row = (r1 % area.height as u32) as u16;
+        let side = if r2 % 2 == 0 { area.x } else { area.x + area.width - 1 };
+        let ch = JUNK_CHARS[(r1 as usize / 7) % JUNK_CHARS.len()];
+
+        if row < area.height && side < area.x + area.width {
+            f.render_widget(
+                Paragraph::new(Line::from(Span::styled(
+                    ch.to_string(),
+                    Style::default().fg(pal.text_dim).bg(pal.bg),
+                ))),
+                ratatui::layout::Rect::new(side, area.y + row, 1, 1),
+            );
+        }
+    }
+
+    // Horizontal glitch line: rare, every ~50 ticks, single row shifts
+    if tick % 53 == 7 {
+        let r = app.glitch_rand(2);
+        let row = (r % area.height as u32) as u16;
+        let glitch_str: String = (0..area.width)
+            .map(|i| {
+                let gi = app.glitch_rand(100 + i as u32);
+                JUNK_CHARS[(gi as usize) % JUNK_CHARS.len()]
+            })
+            .collect();
+
+        if row < area.height {
+            f.render_widget(
+                Paragraph::new(Line::from(Span::styled(
+                    glitch_str,
+                    Style::default().fg(pal.border_dim).bg(pal.bg),
+                ))),
+                ratatui::layout::Rect::new(area.x, area.y + row, area.width, 1),
+            );
+        }
+    }
 }

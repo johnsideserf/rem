@@ -6,6 +6,16 @@ use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 
 use crate::app::{App, Mode};
 
+/// Compute how many rows the footer needs at the given width.
+pub fn required_height(app: &App, width: u16) -> u16 {
+    if app.error.is_some() || matches!(app.mode, Mode::Confirm { .. }) {
+        return 1;
+    }
+    let hints = collect_hints(app);
+    let sep_width = separator_width(app);
+    lines_needed(&hints, sep_width, width as usize).max(1) as u16
+}
+
 pub fn render(f: &mut Frame, app: &App, area: Rect) {
     let pal = app.palette;
 
@@ -65,9 +75,97 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
+    let hints = collect_hints(app);
+    let sep = format!("  {}  ", app.symbols.separator);
+    let sep_width = sep.chars().count();
+    let width = area.width as usize;
+
+    // Build wrapped lines
+    let mut lines: Vec<Line> = Vec::new();
+    let mut current_spans: Vec<Span> = Vec::new();
+    let mut current_width: usize = 0;
+    let mut is_first_on_line = true;
+
+    // Archive mode prefix
+    let prefix = if app.archive.is_some() && matches!(app.mode, Mode::Normal) {
+        Some(" ARCHIVE MODE \u{2014} READ ONLY  ")
+    } else {
+        None
+    };
+
+    if let Some(pfx) = prefix {
+        let pfx_width = pfx.chars().count();
+        current_spans.push(Span::styled(pfx, Style::default().fg(pal.warn).bg(pal.surface)));
+        current_width += pfx_width;
+    } else {
+        current_spans.push(Span::styled(" ", Style::default().bg(pal.surface)));
+        current_width += 1;
+    }
+
+    for (key, desc) in hints.iter() {
+        let hint_text_width = key.chars().count() + 1 + desc.chars().count(); // "key desc"
+        let segment_width = if is_first_on_line {
+            hint_text_width
+        } else {
+            sep_width + hint_text_width
+        };
+
+        // Wrap if this segment would exceed the line width
+        if !is_first_on_line && current_width + segment_width > width {
+            lines.push(Line::from(current_spans));
+            current_spans = vec![Span::styled(" ", Style::default().bg(pal.surface))];
+            current_width = 1;
+            is_first_on_line = true;
+        }
+
+        if !is_first_on_line {
+            current_spans.push(Span::styled(
+                sep.clone(),
+                Style::default().fg(pal.border_mid).bg(pal.surface),
+            ));
+            current_width += sep_width;
+        }
+
+        current_spans.push(Span::styled(
+            *key,
+            Style::default().fg(pal.text_mid).bg(pal.surface),
+        ));
+        current_spans.push(Span::styled(
+            format!(" {}", desc),
+            Style::default().fg(pal.text_dim).bg(pal.surface),
+        ));
+        current_width += hint_text_width;
+        is_first_on_line = false;
+    }
+
+    if !current_spans.is_empty() {
+        lines.push(Line::from(current_spans));
+    }
+
+    let block = Block::default()
+        .borders(Borders::NONE)
+        .style(Style::default().bg(pal.surface));
+
+    let paragraph = Paragraph::new(lines).block(block);
+    f.render_widget(paragraph, area);
+}
+
+/// Collect the hint pairs for the current mode.
+fn collect_hints(app: &App) -> Vec<(&'static str, &'static str)> {
     let has_marks = !app.visual_marks.is_empty();
 
-    let hints: Vec<(&str, &str)> = match app.mode {
+    // Archive mode (#19)
+    if app.archive.is_some() && matches!(app.mode, Mode::Normal) {
+        return vec![
+            ("hjkl", "move"),
+            ("enter", "open"),
+            ("h", "back"),
+            ("/", "fuzzy"),
+            ("q", "quit"),
+        ];
+    }
+
+    match app.mode {
         Mode::Normal | Mode::WaitingForG | Mode::WaitingForMark
         | Mode::WaitingForJumpToMark | Mode::WaitingForYank | Mode::WaitingForCut
         | Mode::WaitingForDeleteMark => {
@@ -87,11 +185,11 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
                 h.push(("u", "clear"));
             }
             h.push(("r", "rename"));
+            h.push(("#", "hash"));
+            h.push(("W", "usage"));
             h.push(("s", "sort"));
             h.push(("tab", "panel"));
-            h.push(("[]", "resize"));
             h.push(("t", "theme"));
-            h.push(("`", "telem"));
             h.push(("q", "quit"));
             h
         }
@@ -162,32 +260,32 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
                 ("esc", "exit"),
             ]
         }
-        Mode::Confirm { .. } => unreachable!(), // handled above
-    };
-
-    let sep = format!("  {}  ", app.symbols.separator);
-    let mut spans: Vec<Span> = vec![Span::styled(" ", Style::default().bg(pal.surface))];
-    for (i, (key, desc)) in hints.iter().enumerate() {
-        if i > 0 {
-            spans.push(Span::styled(
-                sep.clone(),
-                Style::default().fg(pal.border_mid).bg(pal.surface),
-            ));
-        }
-        spans.push(Span::styled(
-            *key,
-            Style::default().fg(pal.text_mid).bg(pal.surface),
-        ));
-        spans.push(Span::styled(
-            format!(" {}", desc),
-            Style::default().fg(pal.text_dim).bg(pal.surface),
-        ));
+        Mode::Confirm { .. } => unreachable!(),
     }
+}
 
-    let block = Block::default()
-        .borders(Borders::NONE)
-        .style(Style::default().bg(pal.surface));
+/// Get the char-width of the separator string.
+fn separator_width(app: &App) -> usize {
+    // "  {sep}  " = 2 + sep.chars().count() + 2
+    2 + app.symbols.separator.chars().count() + 2
+}
 
-    let paragraph = Paragraph::new(Line::from(spans)).block(block);
-    f.render_widget(paragraph, area);
+/// Calculate how many lines the hints need at the given terminal width.
+fn lines_needed(hints: &[(&str, &str)], sep_width: usize, width: usize) -> usize {
+    if hints.is_empty() {
+        return 1;
+    }
+    let mut lines = 1usize;
+    let mut x = 1usize; // leading space
+    for (i, (key, desc)) in hints.iter().enumerate() {
+        let hint_w = key.chars().count() + 1 + desc.chars().count();
+        let segment_w = if i == 0 { hint_w } else { sep_width + hint_w };
+        if i > 0 && x + segment_w > width {
+            lines += 1;
+            x = 1 + hint_w;
+        } else {
+            x += segment_w;
+        }
+    }
+    lines
 }

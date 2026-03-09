@@ -13,8 +13,22 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
 pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect, show_cursor: bool) {
     let pal = app.palette;
 
-    let path_str = app.panes[pane_idx].current_dir.to_string_lossy().into_owned();
-    let segments: Vec<&str> = path_str.split(['/', '\\']).filter(|s| !s.is_empty()).collect();
+    // Archive mode: show archive path with internal directory (#19)
+    let archive_path_str;
+    let path_str = if let Some(archive) = &app.archive {
+        let archive_name = archive.archive_path.file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        archive_path_str = if archive.internal_dir.is_empty() {
+            format!("{}:", archive_name)
+        } else {
+            format!("{}:/{}", archive_name, archive.internal_dir.trim_end_matches('/'))
+        };
+        archive_path_str.clone()
+    } else {
+        app.panes[pane_idx].current_dir.to_string_lossy().into_owned()
+    };
+    let segments: Vec<&str> = path_str.split(['/', '\\', ':']).filter(|s| !s.is_empty()).collect();
 
     let mut spans = vec![Span::styled(" ", Style::default())];
 
@@ -57,10 +71,12 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect, show_c
         spans.push(Span::styled("  ", Style::default()));
     }
 
+    // Use pulsed border color for active pane (#18)
+    let border_color = if show_cursor { app.pulsed_border() } else { pal.border_dim };
     let block = Block::default()
         .borders(Borders::BOTTOM)
         .border_type(BorderType::Plain)
-        .border_style(Style::default().fg(pal.border_dim))
+        .border_style(Style::default().fg(border_color))
         .style(Style::default().bg(pal.bg));
 
     let paragraph = Paragraph::new(Line::from(spans)).block(block);

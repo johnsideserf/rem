@@ -86,6 +86,31 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         )));
     }
 
+    // SHA-256 hash display (#20)
+    if let Some(entry) = app.current_entry() {
+        if let Some((hash_path, hash_val)) = &app.last_hash {
+            if *hash_path == entry.path {
+                lines.push(Line::from(Span::raw("")));
+                lines.push(Line::from(Span::styled(
+                    " I N T E G R I T Y",
+                    Style::default().fg(pal.text_dim).bg(pal.bg),
+                )));
+                // Show hash in two lines (32 chars each)
+                let max_hash = width.saturating_sub(10);
+                let display_hash = if hash_val.len() > max_hash {
+                    let t = &hash_val[..max_hash.saturating_sub(1)];
+                    format!("{}\u{2026}", t)
+                } else {
+                    hash_val.clone()
+                };
+                lines.push(Line::from(vec![
+                    Span::styled(" SHA256 ", Style::default().fg(pal.text_dim).bg(pal.bg)),
+                    Span::styled(display_hash, Style::default().fg(pal.text_hot).bg(pal.bg)),
+                ]));
+            }
+        }
+    }
+
     // Blank separator
     lines.push(Line::from(Span::raw("")));
 

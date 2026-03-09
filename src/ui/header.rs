@@ -28,7 +28,10 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     let mut spans = vec![
         Span::styled(" REM", Style::default().fg(pal.text_hot).add_modifier(Modifier::BOLD)),
         Span::styled(format!("  {}  ", app.symbols.separator), Style::default().fg(pal.text_dim)),
-        Span::styled("FILE SYSTEM", Style::default().fg(pal.text_mid)),
+        Span::styled(
+            if app.archive.is_some() { "ARCHIVE" } else { "FILE SYSTEM" },
+            Style::default().fg(if app.archive.is_some() { pal.warn } else { pal.text_mid }),
+        ),
         Span::styled(format!("  {}  ", app.symbols.separator), Style::default().fg(pal.text_dim)),
         Span::styled(format!("ITEMS:{}", item_count), Style::default().fg(pal.text_hot)),
     ];
@@ -71,10 +74,58 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         spans.push(Span::styled("TELEM:ACTIVE", Style::default().fg(pal.text_hot)));
     }
 
+    // I/O activity throbber (#16)
+    if app.io_flash_tick > 0 {
+        spans.push(Span::styled("  \u{00b7}  ", Style::default().fg(pal.text_dim)));
+        spans.push(Span::styled(
+            format!("{} I/O", app.io_throbber.frame()),
+            Style::default().fg(pal.text_hot),
+        ));
+    }
+
+    // Hash progress (#20)
+    if let Some(hop) = &app.hash_op {
+        spans.push(Span::styled("  \u{00b7}  ", Style::default().fg(pal.text_dim)));
+        let pct = (hop.progress * 100.0) as u64;
+        spans.push(Span::styled(
+            format!("{} HASH:{}%", hop.throbber.frame(), pct),
+            Style::default().fg(pal.text_hot),
+        ));
+    }
+
+    // Disk scan progress (#21)
+    if let Some(ds) = &app.disk_scan {
+        spans.push(Span::styled("  \u{00b7}  ", Style::default().fg(pal.text_dim)));
+        spans.push(Span::styled(
+            format!("{} SCAN:{}", ds.throbber.frame(), ds.nodes),
+            Style::default().fg(pal.text_hot),
+        ));
+    }
+
+    // Archive indicator (#19)
+    if app.archive.is_some() {
+        spans.push(Span::styled("  \u{00b7}  ", Style::default().fg(pal.text_dim)));
+        spans.push(Span::styled("ARCHIVE", Style::default().fg(pal.warn)));
+    }
+
     spans.push(Span::styled("  \u{00b7}  ", Style::default().fg(pal.text_dim)));
     spans.push(Span::styled(app.heartbeat.frame(), Style::default().fg(pal.text_hot)));
     spans.push(Span::styled("  ", Style::default()));
-    spans.push(Span::styled("SYS:NOMINAL", Style::default().fg(pal.text_hot)));
+
+    // Signal indicator: cyan shows degraded signal (#15)
+    let signal_label = if matches!(pal.variant, crate::throbber::PaletteVariant::Cyan) {
+        let tick = app.glitch_tick;
+        if tick % 37 < 3 {
+            "SIGNAL:\u{2591}\u{2591}\u{2591}"
+        } else if tick % 23 < 2 {
+            "SIGNAL:WEAK"
+        } else {
+            "SIGNAL:NOMINAL"
+        }
+    } else {
+        "SYS:NOMINAL"
+    };
+    spans.push(Span::styled(signal_label, Style::default().fg(pal.text_hot)));
 
     let left_block = Block::default()
         .borders(Borders::BOTTOM)

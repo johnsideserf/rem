@@ -1,10 +1,22 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use crate::app::{App, EditorState, FsEntry, GitInfo, Mode, PaneState, SortMode};
+use std::sync::mpsc;
+
+use crate::app::{App, ArchiveContext, EditorState, FsEntry, GitInfo, Mode, PaneState, SortMode};
+use crate::app::{DiskScanMessage, DiskScanOp, DiskUsageData, DiskUsageEntry};
+use crate::app::{HashMessage, HashOp};
+use crate::throbber::{Throbber, ThrobberKind};
 
 impl App {
     pub fn load_entries(&mut self) {
+        // Don't load FS entries when browsing an archive (#19)
+        if self.archive.is_some() {
+            self.populate_archive_entries();
+            return;
+        }
+        // Flash I/O indicator (#16)
+        self.io_flash_tick = 3;
         let sort_mode = self.sort_mode;
         let pane = self.pane_mut();
         pane.entries.clear();
@@ -104,6 +116,26 @@ impl App {
     }
 
     pub fn go_parent(&mut self) {
+        // Archive mode: go up within archive or exit (#19)
+        if let Some(archive) = &self.archive {
+            if archive.internal_dir.is_empty() {
+                // At archive root — exit archive
+                self.exit_archive();
+            } else {
+                // Go up one level within archive
+                let dir = archive.internal_dir.trim_end_matches('/');
+                let parent = match dir.rfind('/') {
+                    Some(pos) => format!("{}/", &dir[..pos]),
+                    None => String::new(),
+                };
+                if let Some(a) = &mut self.archive {
+                    a.internal_dir = parent;
+                }
+                self.populate_archive_entries();
+            }
+            return;
+        }
+
         if let Some(parent) = self.pane().current_dir.parent().map(|p| p.to_path_buf()) {
             self.navigate_to(parent);
         }
@@ -140,15 +172,64 @@ impl App {
     }
 
     pub fn enter_selected(&mut self) {
+        // Archive mode navigation (#19)
+        if self.archive.is_some() {
+            let pane = self.pane();
+            if let Some(&idx) = pane.filtered_indices.get(pane.cursor) {
+                let entry = &pane.entries[idx];
+                if entry.is_dir {
+                    let new_dir = entry.path.to_string_lossy().into_owned();
+                    if let Some(archive) = &mut self.archive {
+                        archive.internal_dir = new_dir;
+                    }
+                    self.populate_archive_entries();
+                }
+                // Files inside archives are read-only — no action
+            }
+            return;
+        }
+
         let pane = self.pane();
         if let Some(&idx) = pane.filtered_indices.get(pane.cursor) {
             let entry = &pane.entries[idx];
             if entry.is_dir {
                 let path = entry.path.clone();
                 self.navigate_to(path);
+            } else if crate::archive::is_archive(&entry.path) {
+                // Enter archive (#19)
+                let path = entry.path.clone();
+                self.enter_archive(path);
             } else {
                 self.open_request = Some(crate::app::OpenRequest::SystemDefault(entry.path.clone()));
             }
+        }
+    }
+
+    /// Enter an archive for browsing (#19).
+    fn enter_archive(&mut self, path: PathBuf) {
+        match crate::archive::read_zip(&path) {
+            Ok(entries) => {
+                self.archive = Some(ArchiveContext {
+                    archive_path: path,
+                    internal_dir: String::new(),
+                    all_entries: entries,
+                });
+                self.populate_archive_entries();
+            }
+            Err(e) => {
+                self.error = Some((e, Instant::now()));
+            }
+        }
+    }
+
+    /// Exit archive mode (#19).
+    pub fn exit_archive(&mut self) {
+        if let Some(archive) = self.archive.take() {
+            // Navigate back to the directory containing the archive
+            if let Some(parent) = archive.archive_path.parent() {
+                self.pane_mut().current_dir = parent.to_path_buf();
+            }
+            self.load_entries();
         }
     }
 
@@ -325,6 +406,180 @@ impl App {
         // Cap results for rendering performance
         scored.truncate(1000);
         self.rsearch_results = scored;
+    }
+
+    /// Start SHA-256 hash computation on the selected file (#20).
+    pub fn hash_selected(&mut self) {
+        let entry = match self.current_entry() {
+            Some(e) if !e.is_dir => e,
+            _ => return,
+        };
+        let path = entry.path.clone();
+
+        if self.hash_op.is_some() {
+            self.error = Some(("HASH ALREADY IN PROGRESS".to_string(), Instant::now()));
+            return;
+        }
+
+        let (tx, rx) = mpsc::channel();
+        let hash_path = path.clone();
+        let variant = self.palette.variant;
+
+        self.hash_op = Some(HashOp {
+            path: path.clone(),
+            progress: 0.0,
+            throbber: Throbber::new(ThrobberKind::Processing, variant),
+            receiver: rx,
+        });
+
+        std::thread::spawn(move || {
+            use sha2::{Sha256, Digest};
+            use std::io::Read;
+
+            let file = match std::fs::File::open(&hash_path) {
+                Ok(f) => f,
+                Err(e) => {
+                    let _ = tx.send(HashMessage::Error(format!("{}", e)));
+                    return;
+                }
+            };
+            let file_size = file.metadata().map(|m| m.len()).unwrap_or(1).max(1);
+            let mut reader = std::io::BufReader::new(file);
+            let mut hasher = Sha256::new();
+            let mut buf = [0u8; 65536];
+            let mut total_read = 0u64;
+
+            loop {
+                let n = match reader.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => n,
+                    Err(e) => {
+                        let _ = tx.send(HashMessage::Error(format!("{}", e)));
+                        return;
+                    }
+                };
+                hasher.update(&buf[..n]);
+                total_read += n as u64;
+                let _ = tx.send(HashMessage::Progress(total_read as f64 / file_size as f64));
+            }
+
+            let result = hasher.finalize();
+            let hex: String = result.iter().map(|b| format!("{:02x}", b)).collect();
+            let _ = tx.send(HashMessage::Complete(hex));
+        });
+    }
+
+    /// Start recursive disk usage scan on a directory (#21).
+    pub fn scan_disk_usage(&mut self) {
+        let entry = match self.current_entry() {
+            Some(e) if e.is_dir => e,
+            _ => {
+                // Scan current directory if cursor isn't on a dir
+                let dir = self.pane().current_dir.clone();
+                let dir_name = dir.file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| dir.to_string_lossy().into_owned());
+                self.start_disk_scan(dir, dir_name);
+                return;
+            }
+        };
+        let path = entry.path.clone();
+        let dir_name = entry.name.clone();
+        self.start_disk_scan(path, dir_name);
+    }
+
+    fn start_disk_scan(&mut self, path: PathBuf, dir_name: String) {
+        if self.disk_scan.is_some() {
+            self.error = Some(("SCAN ALREADY IN PROGRESS".to_string(), Instant::now()));
+            return;
+        }
+
+        let (tx, rx) = mpsc::channel();
+        let variant = self.palette.variant;
+
+        self.disk_scan = Some(DiskScanOp {
+            dir_name: dir_name.clone(),
+            nodes: 0,
+            throbber: Throbber::new(ThrobberKind::DataStream, variant),
+            receiver: rx,
+        });
+
+        let scan_path = path.clone();
+        std::thread::spawn(move || {
+            let mut size_map: std::collections::HashMap<String, (u64, bool)> = std::collections::HashMap::new();
+            let mut total_size = 0u64;
+            let mut total_items = 0u64;
+
+            fn walk(
+                dir: &std::path::Path,
+                size_map: &mut std::collections::HashMap<String, (u64, bool)>,
+                total_size: &mut u64,
+                total_items: &mut u64,
+                base: &std::path::Path,
+                tx: &mpsc::Sender<DiskScanMessage>,
+            ) {
+                let rd = match std::fs::read_dir(dir) {
+                    Ok(rd) => rd,
+                    Err(_) => return,
+                };
+                for entry in rd.flatten() {
+                    let meta = match entry.metadata() {
+                        Ok(m) => m,
+                        Err(_) => continue,
+                    };
+                    *total_items += 1;
+                    if *total_items % 500 == 0 {
+                        let _ = tx.send(DiskScanMessage::Progress(*total_items));
+                    }
+
+                    let entry_path = entry.path();
+                    // Get top-level child name relative to base
+                    let rel = match entry_path.strip_prefix(base) {
+                        Ok(r) => r,
+                        Err(_) => continue,
+                    };
+                    let top_name = rel.components().next()
+                        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                        .unwrap_or_default();
+
+                    if meta.is_dir() {
+                        size_map.entry(top_name.clone()).or_insert((0, true));
+                        walk(&entry_path, size_map, total_size, total_items, base, tx);
+                    } else {
+                        let sz = meta.len();
+                        *total_size += sz;
+                        let e = size_map.entry(top_name).or_insert((0, false));
+                        e.0 += sz;
+                        // If we already set is_dir=true, keep it
+                    }
+                }
+            }
+
+            // First, get direct children to know which are dirs
+            if let Ok(rd) = std::fs::read_dir(&scan_path) {
+                for entry in rd.flatten() {
+                    if let Ok(m) = entry.metadata() {
+                        let name = entry.file_name().to_string_lossy().into_owned();
+                        size_map.insert(name, (if m.is_dir() { 0 } else { m.len() }, m.is_dir()));
+                    }
+                }
+            }
+
+            walk(&scan_path, &mut size_map, &mut total_size, &mut total_items, &scan_path, &tx);
+
+            let mut entries: Vec<DiskUsageEntry> = size_map.into_iter()
+                .map(|(name, (size, is_dir))| DiskUsageEntry { name, size, is_dir })
+                .collect();
+            entries.sort_by(|a, b| b.size.cmp(&a.size));
+            entries.truncate(50);
+
+            let _ = tx.send(DiskScanMessage::Complete(DiskUsageData {
+                path: scan_path,
+                entries,
+                total_size,
+                total_items,
+            }));
+        });
     }
 
     /// Navigate to the selected recursive search result.

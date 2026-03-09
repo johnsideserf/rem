@@ -12,3 +12,5 @@ toml = "0.8"
 dirs = "6"
 sysinfo = "0.34"
 ignore = "0.4.25"
+sha2 = "0.10"
+zip = { version = "2", default-features = false, features = ["deflate"] }
