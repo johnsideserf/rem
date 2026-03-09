@@ -113,7 +113,7 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     spans.push(Span::styled("  ", Style::default()));
 
     // Signal indicator: cyan shows degraded signal (#15)
-    let signal_label = if matches!(pal.variant, crate::throbber::PaletteVariant::Cyan) {
+    let signal_label = if app.glitch_enabled && matches!(pal.variant, crate::throbber::PaletteVariant::Cyan) {
         let tick = app.glitch_tick;
         if tick % 37 < 3 {
             "SIGNAL:\u{2591}\u{2591}\u{2591}"

@@ -575,6 +575,11 @@ pub struct App {
     pub disk_scan: Option<DiskScanOp>,
     // Archive browsing (#19)
     pub archive: Option<ArchiveContext>,
+    // Glitch effects toggle
+    pub glitch_enabled: bool,
+    // Phosphor trail for green CRT effect
+    pub prev_cursor_pos: usize,
+    pub phosphor_trail: Vec<(usize, u8)>, // (cursor index, fade frames remaining)
 }
 
 impl App {
@@ -637,6 +642,9 @@ impl App {
             disk_usage: None,
             disk_scan: None,
             archive: None,
+            glitch_enabled: true,
+            prev_cursor_pos: 0,
+            phosphor_trail: Vec::new(),
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);
@@ -737,6 +745,21 @@ impl App {
         self.idle_active = now.duration_since(self.last_input).as_secs() >= 45;
         // CRT glitch (#15)
         self.glitch_tick = self.glitch_tick.wrapping_add(1);
+        // Green phosphor trail: track cursor movement, decay ghosts
+        let current_cursor = self.pane().cursor;
+        if current_cursor != self.prev_cursor_pos {
+            if self.prev_cursor_pos < self.pane().filtered_indices.len() {
+                self.phosphor_trail.push((self.prev_cursor_pos, 6));
+                if self.phosphor_trail.len() > 4 {
+                    self.phosphor_trail.remove(0);
+                }
+            }
+            self.prev_cursor_pos = current_cursor;
+        }
+        for ghost in self.phosphor_trail.iter_mut() {
+            ghost.1 = ghost.1.saturating_sub(1);
+        }
+        self.phosphor_trail.retain(|g| g.1 > 0);
         // Hash progress polling (#20)
         let mut hash_done = false;
         if let Some(hop) = &mut self.hash_op {

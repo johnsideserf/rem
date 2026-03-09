@@ -580,22 +580,29 @@ fn handle_theme_picker(app: &mut App, key: KeyEvent) {
                 }
                 crate::config::save_theme(new_palette.variant);
             } else {
-                // Symbol set selection
                 let sym_idx = app.theme_picker_cursor - color_count;
-                if let Some(&variant) = crate::symbols::SymbolVariant::ALL.get(sym_idx) {
-                    let new_symbols = crate::symbols::SymbolSet::for_variant(variant);
-                    app.symbols = new_symbols;
-                    app.heartbeat = Throbber::from_frames(
-                        new_symbols.heartbeat_frames,
-                        ThrobberKind::Heartbeat,
-                    );
-                    if let Some(throb) = &mut app.telemetry_throbber {
-                        *throb = Throbber::from_frames(
-                            new_symbols.throbber_frames,
-                            ThrobberKind::Processing,
+                let sym_count = crate::symbols::SymbolVariant::ALL.len();
+                if sym_idx < sym_count {
+                    // Symbol set selection
+                    if let Some(&variant) = crate::symbols::SymbolVariant::ALL.get(sym_idx) {
+                        let new_symbols = crate::symbols::SymbolSet::for_variant(variant);
+                        app.symbols = new_symbols;
+                        app.heartbeat = Throbber::from_frames(
+                            new_symbols.heartbeat_frames,
+                            ThrobberKind::Heartbeat,
                         );
+                        if let Some(throb) = &mut app.telemetry_throbber {
+                            *throb = Throbber::from_frames(
+                                new_symbols.throbber_frames,
+                                ThrobberKind::Processing,
+                            );
+                        }
+                        crate::config::save_symbols(variant);
                     }
-                    crate::config::save_symbols(variant);
+                } else {
+                    // Glitch toggle
+                    app.glitch_enabled = !app.glitch_enabled;
+                    crate::config::save_glitch(app.glitch_enabled);
                 }
             }
             app.show_theme_picker = false;

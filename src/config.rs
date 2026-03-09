@@ -28,6 +28,7 @@ struct BehaviorConfig {
     boot_sequence: Option<bool>,
     sort_mode: Option<String>,
     reduce_motion: Option<bool>,
+    glitch_enabled: Option<bool>,
 }
 
 pub struct Config {
@@ -38,6 +39,7 @@ pub struct Config {
     pub boot_sequence: bool,
     pub sort_mode: SortMode,
     pub reduce_motion: bool,
+    pub glitch_enabled: bool,
 }
 
 impl Default for Config {
@@ -50,6 +52,7 @@ impl Default for Config {
             boot_sequence: true,
             sort_mode: SortMode::default(),
             reduce_motion: false,
+            glitch_enabled: true,
         }
     }
 }
@@ -136,6 +139,27 @@ pub fn save_sort_mode(mode: SortMode) {
     let _ = std::fs::write(&path, doc.to_string());
 }
 
+/// Save the glitch_enabled setting to config.toml, preserving other settings.
+pub fn save_glitch(enabled: bool) {
+    let Some(path) = config_path() else { return };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
+    let mut doc: toml::Table = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or_default();
+
+    let behavior = doc.entry("behavior")
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+    if let toml::Value::Table(t) = behavior {
+        t.insert("glitch_enabled".to_string(), toml::Value::Boolean(enabled));
+    }
+
+    let _ = std::fs::write(&path, doc.to_string());
+}
+
 impl Config {
     /// Load config from file, then apply CLI overrides.
     pub fn load(args: &[String]) -> Self {
@@ -170,6 +194,9 @@ impl Config {
                     }
                     if let Some(v) = file.behavior.reduce_motion {
                         cfg.reduce_motion = v;
+                    }
+                    if let Some(v) = file.behavior.glitch_enabled {
+                        cfg.glitch_enabled = v;
                     }
                     if let Some(s) = &file.behavior.sort_mode {
                         cfg.sort_mode = match s.as_str() {

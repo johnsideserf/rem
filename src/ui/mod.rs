@@ -138,8 +138,12 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     }
 
     // CRT glitch effects for cyan palette (#15)
-    if matches!(app.palette.variant, crate::throbber::PaletteVariant::Cyan) {
-        render_cyan_glitch(f, app, area);
+    if app.glitch_enabled {
+        match app.palette.variant {
+            crate::throbber::PaletteVariant::Cyan => render_cyan_glitch(f, app, area),
+            crate::throbber::PaletteVariant::Green => render_green_effects(f, app, area),
+            crate::throbber::PaletteVariant::Amber => render_amber_effects(f, app, area),
+        }
     }
 }
 
@@ -251,8 +255,12 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     }
 
     // CRT glitch effects for cyan palette (#15)
-    if matches!(app.palette.variant, crate::throbber::PaletteVariant::Cyan) {
-        render_cyan_glitch(f, app, area);
+    if app.glitch_enabled {
+        match app.palette.variant {
+            crate::throbber::PaletteVariant::Cyan => render_cyan_glitch(f, app, area),
+            crate::throbber::PaletteVariant::Green => render_green_effects(f, app, area),
+            crate::throbber::PaletteVariant::Amber => render_amber_effects(f, app, area),
+        }
     }
 }
 
@@ -467,6 +475,126 @@ fn render_cyan_glitch(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
                 ))),
                 ratatui::layout::Rect::new(area.x, area.y + row, area.width, 1),
             );
+        }
+    }
+}
+
+/// Green phosphor CRT effects: scan line shimmer + phosphor persistence.
+fn render_green_effects(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+    use ratatui::style::Color;
+    use ratatui::text::{Line, Span};
+    use ratatui::widgets::Paragraph;
+
+    let pal = app.palette;
+    let tick = app.glitch_tick;
+
+    // Scan line shimmer: a faint horizontal line sweeping downward
+    // Moves one row every 4 ticks, wraps around
+    let scan_row = ((tick / 4) % area.height as u32) as u16;
+    if scan_row < area.height {
+        // Render a subtle underline-style bar across the width
+        let shimmer_color = match pal.border_mid {
+            Color::Rgb(r, g, b) => Color::Rgb(
+                (r as u16 / 2) as u8,
+                (g as u16 / 2) as u8,
+                (b as u16 / 2) as u8,
+            ),
+            c => c,
+        };
+        let line_str: String = "\u{2581}".repeat(area.width as usize); // ▁ lower one eighth
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                line_str,
+                Style::default().fg(shimmer_color).bg(pal.bg),
+            ))),
+            ratatui::layout::Rect::new(area.x, area.y + scan_row, area.width, 1),
+        );
+    }
+
+    // Phosphor persistence: faint ghost marks at previous cursor positions
+    // These render on the left edge (indicator column) as dim afterimages
+    let pane = app.pane();
+    for &(cursor_idx, fade) in &app.phosphor_trail {
+        if cursor_idx < pane.scroll_offset || cursor_idx >= pane.scroll_offset + pane.viewport_height {
+            continue;
+        }
+        let visual_row = (cursor_idx - pane.scroll_offset) as u16;
+        // Body area starts after header(2) + breadcrumb(2) = row 4
+        let screen_row = area.y + visual_row;
+        if screen_row >= area.y + area.height {
+            continue;
+        }
+
+        // Fade: 6→bright, 1→almost invisible
+        let intensity = fade as f32 / 6.0;
+        let ghost_color = match pal.text_dim {
+            Color::Rgb(r, g, b) => Color::Rgb(
+                (r as f32 * intensity * 0.6) as u8,
+                (g as f32 * intensity * 0.6) as u8,
+                (b as f32 * intensity * 0.6) as u8,
+            ),
+            c => c,
+        };
+
+        // Render a faint cursor ghost at the indicator column
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                "\u{25b8}", // ▸ small right triangle
+                Style::default().fg(ghost_color).bg(pal.bg),
+            ))),
+            ratatui::layout::Rect::new(area.x, screen_row, 1, 1),
+        );
+    }
+}
+
+/// Amber CRT effects: rare thermal flicker.
+fn render_amber_effects(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+    use ratatui::text::{Line, Span};
+    use ratatui::widgets::Paragraph;
+
+    let pal = app.palette;
+    let tick = app.glitch_tick;
+
+    // Thermal flicker: very rare (every ~120 ticks), a single row
+    // briefly shows a faint voltage-spike artifact at the edge
+    if tick % 127 < 2 {
+        let r = app.glitch_rand(3);
+        let row = (r % area.height as u32) as u16;
+        if row < area.height {
+            // Subtle bright pip on the right edge
+            let x = area.x + area.width.saturating_sub(1);
+            f.render_widget(
+                Paragraph::new(Line::from(Span::styled(
+                    "\u{2502}", // │
+                    Style::default().fg(pal.text_hot),
+                ))),
+                ratatui::layout::Rect::new(x, area.y + row, 1, 1),
+            );
+        }
+    }
+
+    // Cursor bloom: when cursor just moved, briefly brighten the right edge
+    // of the new row with a warm glow that fades over 3 frames
+    if !app.phosphor_trail.is_empty() {
+        // Reuse phosphor_trail — the most recent entry is the row we just left,
+        // so the cursor's *new* position is the bloom target
+        let pane = app.pane();
+        let cursor = pane.cursor;
+        if cursor >= pane.scroll_offset && cursor < pane.scroll_offset + pane.viewport_height {
+            let visual_row = (cursor - pane.scroll_offset) as u16;
+            let screen_row = area.y + visual_row;
+            // Only show bloom for a few ticks after movement (trail is non-empty = recent move)
+            let most_recent_fade = app.phosphor_trail.last().map(|t| t.1).unwrap_or(0);
+            if most_recent_fade >= 4 && screen_row < area.y + area.height {
+                let x = area.x + area.width.saturating_sub(2);
+                f.render_widget(
+                    Paragraph::new(Line::from(Span::styled(
+                        "\u{2590}", // ▐ right half block
+                        Style::default().fg(pal.border_mid),
+                    ))),
+                    ratatui::layout::Rect::new(x, screen_row, 1, 1),
+                );
+            }
         }
     }
 }

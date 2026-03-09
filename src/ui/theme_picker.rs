@@ -18,9 +18,9 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     let pal = app.palette;
     let sym_variants = SymbolVariant::ALL;
 
-    // Height: border(2) + color title(1) + blank(1) + 3 themes + blank(1) + sym title(1) + sym items
+    // Height: border(2) + color title(1) + blank(1) + 3 themes + blank(1) + sym title(1) + sym items + blank(1) + effects title(1) + glitch toggle(1)
     let box_w: u16 = 42;
-    let box_h: u16 = (THEMES.len() + sym_variants.len()) as u16 + 7;
+    let box_h: u16 = (THEMES.len() + sym_variants.len()) as u16 + 11;
 
     let x = area.x + area.width.saturating_sub(box_w) / 2;
     let y = area.y + area.height.saturating_sub(box_h) / 2;
@@ -102,6 +102,37 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         ]));
     }
 
+    // Blank separator
+    lines.push(Line::from(Span::raw("")));
+
+    // Effects section title
+    lines.push(Line::from(Span::styled(
+        " E F F E C T S",
+        Style::default().fg(pal.text_mid),
+    )));
+
+    // Glitch toggle
+    {
+        let idx = THEMES.len() + sym_variants.len();
+        let is_selected = idx == app.theme_picker_cursor;
+        let marker = if is_selected { format!("{} ", app.symbols.cursor) } else { "  ".to_string() };
+        let status = if app.glitch_enabled { "ON" } else { "OFF" };
+        let status_style = if app.glitch_enabled { pal.text_hot } else { pal.text_dim };
+
+        let name_style = if is_selected {
+            Style::default().fg(pal.text_hot).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(pal.text_mid)
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled(marker, Style::default().fg(pal.text_hot)),
+            Span::styled("CRT GLITCH", name_style),
+            Span::styled(format!("  [{}]", status), Style::default().fg(status_style)),
+            Span::styled("  Signal degradation", Style::default().fg(pal.text_dim)),
+        ]));
+    }
+
     let paragraph = Paragraph::new(lines).block(block);
     f.render_widget(paragraph, popup);
 }
@@ -120,5 +151,5 @@ pub fn palette_for_index(idx: usize) -> Palette {
 pub const THEME_COUNT: usize = THEMES.len();
 
 pub fn total_picker_items() -> usize {
-    THEMES.len() + SymbolVariant::ALL.len()
+    THEMES.len() + SymbolVariant::ALL.len() + 1 // +1 for glitch toggle
 }
