@@ -488,39 +488,60 @@ fn render_green_effects(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     let pal = app.palette;
     let tick = app.glitch_tick;
 
-    // Scan line shimmer: a faint horizontal line sweeping downward
-    // Moves one row every 4 ticks, wraps around
-    let scan_row = ((tick / 4) % area.height as u32) as u16;
-    if scan_row < area.height {
-        // Render a subtle underline-style bar across the width
-        let shimmer_color = match pal.border_mid {
+    // Body content starts after header(2) + breadcrumb(2)
+    let body_top = area.y + 4;
+
+    // Scan line shimmer: subtle edge glow sweeping downward
+    // Moves 1 row per tick for smooth motion; 3-row band with graduated fade
+    let center_row = (tick % area.height as u32) as u16;
+    for offset in 0u16..3 {
+        let row = (center_row + offset) % area.height;
+        if row >= area.height {
+            continue;
+        }
+        // Graduated intensity: center=0.35, edges=0.15
+        let intensity = match offset {
+            0 => 0.15_f32,
+            1 => 0.35,
+            2 => 0.15,
+            _ => 0.0,
+        };
+        let glow_color = match pal.border_dim {
             Color::Rgb(r, g, b) => Color::Rgb(
-                (r as u16 / 2) as u8,
-                (g as u16 / 2) as u8,
-                (b as u16 / 2) as u8,
+                (r as f32 * intensity) as u8,
+                (g as f32 * intensity) as u8,
+                (b as f32 * intensity) as u8,
             ),
             c => c,
         };
-        let line_str: String = "\u{2581}".repeat(area.width as usize); // ▁ lower one eighth
+        // Only render a subtle pip on left and right edges, not replacing content
+        let y = area.y + row;
         f.render_widget(
             Paragraph::new(Line::from(Span::styled(
-                line_str,
-                Style::default().fg(shimmer_color).bg(pal.bg),
+                "\u{2595}", // ▕ right one eighth block
+                Style::default().fg(glow_color),
             ))),
-            ratatui::layout::Rect::new(area.x, area.y + scan_row, area.width, 1),
+            ratatui::layout::Rect::new(area.x, y, 1, 1),
         );
+        if area.width > 1 {
+            f.render_widget(
+                Paragraph::new(Line::from(Span::styled(
+                    "\u{258f}", // ▏ left one eighth block
+                    Style::default().fg(glow_color),
+                ))),
+                ratatui::layout::Rect::new(area.x + area.width - 1, y, 1, 1),
+            );
+        }
     }
 
     // Phosphor persistence: faint ghost marks at previous cursor positions
-    // These render on the left edge (indicator column) as dim afterimages
     let pane = app.pane();
     for &(cursor_idx, fade) in &app.phosphor_trail {
         if cursor_idx < pane.scroll_offset || cursor_idx >= pane.scroll_offset + pane.viewport_height {
             continue;
         }
         let visual_row = (cursor_idx - pane.scroll_offset) as u16;
-        // Body area starts after header(2) + breadcrumb(2) = row 4
-        let screen_row = area.y + visual_row;
+        let screen_row = body_top + visual_row;
         if screen_row >= area.y + area.height {
             continue;
         }
@@ -536,11 +557,10 @@ fn render_green_effects(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             c => c,
         };
 
-        // Render a faint cursor ghost at the indicator column
         f.render_widget(
             Paragraph::new(Line::from(Span::styled(
                 "\u{25b8}", // ▸ small right triangle
-                Style::default().fg(ghost_color).bg(pal.bg),
+                Style::default().fg(ghost_color),
             ))),
             ratatui::layout::Rect::new(area.x, screen_row, 1, 1),
         );
@@ -575,15 +595,14 @@ fn render_amber_effects(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
 
     // Cursor bloom: when cursor just moved, briefly brighten the right edge
     // of the new row with a warm glow that fades over 3 frames
+    // Body content starts after header(2) + breadcrumb(2)
+    let body_top = area.y + 4;
     if !app.phosphor_trail.is_empty() {
-        // Reuse phosphor_trail — the most recent entry is the row we just left,
-        // so the cursor's *new* position is the bloom target
         let pane = app.pane();
         let cursor = pane.cursor;
         if cursor >= pane.scroll_offset && cursor < pane.scroll_offset + pane.viewport_height {
             let visual_row = (cursor - pane.scroll_offset) as u16;
-            let screen_row = area.y + visual_row;
-            // Only show bloom for a few ticks after movement (trail is non-empty = recent move)
+            let screen_row = body_top + visual_row;
             let most_recent_fade = app.phosphor_trail.last().map(|t| t.1).unwrap_or(0);
             if most_recent_fade >= 4 && screen_row < area.y + area.height {
                 let x = area.x + area.width.saturating_sub(2);
