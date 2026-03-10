@@ -40,6 +40,7 @@ pub struct Config {
     pub sort_mode: SortMode,
     pub reduce_motion: bool,
     pub glitch_enabled: bool,
+    pub mouse_enabled: bool,
     pub warnings: Vec<String>,
 }
 
@@ -54,6 +55,7 @@ impl Default for Config {
             sort_mode: SortMode::default(),
             reduce_motion: false,
             glitch_enabled: true,
+            mouse_enabled: true,
             warnings: Vec::new(),
         }
     }
@@ -233,6 +235,7 @@ impl Config {
                 "--cyan" => cfg.palette = Palette::degraded_cyan(),
                 "--green" => cfg.palette = Palette::phosphor_green(),
                 "--no-boot" => cfg.boot_sequence = false,
+                "--no-mouse" => cfg.mouse_enabled = false,
                 _ => {}
             }
         }

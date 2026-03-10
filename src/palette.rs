@@ -14,6 +14,7 @@ pub struct Palette {
     pub border_hot: Color,
     pub warn: Color,
     pub variant: PaletteVariant,
+    pub blink_interval_ms: u32,
 }
 
 impl Palette {
@@ -29,6 +30,7 @@ impl Palette {
             border_hot: Color::Rgb(0, 122, 34),
             warn: Color::Rgb(255, 68, 68),
             variant: PaletteVariant::Green,
+            blink_interval_ms: 550,
         }
     }
 
@@ -44,6 +46,7 @@ impl Palette {
             border_hot: Color::Rgb(128, 88, 0),
             warn: Color::Rgb(255, 68, 68),
             variant: PaletteVariant::Amber,
+            blink_interval_ms: 700,
         }
     }
 
@@ -59,6 +62,7 @@ impl Palette {
             border_hot: Color::Rgb(0, 96, 122),
             warn: Color::Rgb(255, 68, 68),
             variant: PaletteVariant::Cyan,
+            blink_interval_ms: 450,
         }
     }
 }

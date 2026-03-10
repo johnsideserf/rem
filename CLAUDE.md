@@ -60,10 +60,7 @@ The binary crate (`rem`) uses Rust 2024 edition. Entry point is `src/main.rs`.
 
 ## Design Reference
 
-Two PRD documents define the spec (the original `DESIGN_PRD_terminal.md` is superseded):
-
-- **`DESIGN_PRD_theme.md`** — Visual language: palettes, typography, sigils, borders, animation timing, throbber/spinner system, progress bars, boot sequence, confirmation dialogs, component styling.
-- **`DESIGN_PRD_functional.md`** — Feature spec: modes, layout, navigation, file operations, bulk selection, dual-pane, preview, keybindings, config.
+**`DESIGN_PRD_theme.md`** is the visual style guide: palettes, typography, sigils, borders, animation timing, throbber/spinner system, progress bars, boot sequence, confirmation dialogs, component styling.
 
 Key rules from the theme doc:
 - All borders use `BorderType::Plain`, never Rounded or Double

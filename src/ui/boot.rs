@@ -160,7 +160,7 @@ pub fn run_boot(
                     ready_shown = true;
                     phase_timer = Instant::now();
                 }
-                if elapsed >= Duration::from_millis(300) {
+                if elapsed >= Duration::from_millis(1500) {
                     phase = Phase::Done;
                 }
             }
@@ -169,8 +169,8 @@ pub fn run_boot(
             }
         }
 
-        // Safety: don't let boot exceed 4 seconds total
-        if start.elapsed() >= Duration::from_secs(4) {
+        // Safety: don't let boot exceed 6 seconds total
+        if start.elapsed() >= Duration::from_secs(6) {
             return Ok(true);
         }
 

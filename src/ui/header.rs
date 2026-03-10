@@ -72,6 +72,30 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     if app.show_telemetry {
         spans.push(Span::styled("  \u{00b7}  ", Style::default().fg(pal.text_dim)));
         spans.push(Span::styled("TELEM:ACTIVE", Style::default().fg(pal.text_hot)));
+
+        // Network activity indicator with animated braille glyph tied to throughput
+        if let Some(mon) = &app.sysmon {
+            let combined = mon.net.tx_bytes_sec + mon.net.rx_bytes_sec;
+            let tick = app.glitch_tick;
+            // Braille frames get denser with more traffic, rotation speed increases
+            let (frames, label): (&[&str], &str) = if combined > 1024.0 * 1024.0 {
+                (&["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"], "HEAVY")
+            } else if combined > 1024.0 * 10.0 {
+                (&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"], "ACTIVE")
+            } else if combined > 100.0 {
+                (&["⠁", "⠈", "⠐", "⠠", "⢀", "⡀", "⠄", "⠂"], "LOW")
+            } else {
+                (&["·", " ", "·", " "], "IDLE")
+            };
+            // Higher throughput = faster rotation
+            let speed = if combined > 1024.0 * 1024.0 { 1 } else if combined > 1024.0 * 10.0 { 2 } else { 4 };
+            let frame_idx = (tick / speed) as usize % frames.len();
+            spans.push(Span::styled("  \u{00b7}  ", Style::default().fg(pal.text_dim)));
+            spans.push(Span::styled(
+                format!("{} UPLINK:{}", frames[frame_idx], label),
+                Style::default().fg(if combined > 1024.0 * 10.0 { pal.text_hot } else { pal.text_mid }),
+            ));
+        }
     }
 
     // I/O activity throbber (#16)

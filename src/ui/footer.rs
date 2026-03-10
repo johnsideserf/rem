@@ -11,9 +11,18 @@ pub fn required_height(app: &App, width: u16) -> u16 {
     if app.error.is_some() || matches!(app.mode, Mode::Confirm { .. }) {
         return 1;
     }
+    if matches!(app.mode, Mode::Command) {
+        return 1;
+    }
+    let mut h = 0u16;
+    // Disk warning row (#34)
+    if app.disk_warning.is_some() {
+        h += 1;
+    }
     let hints = collect_hints(app);
     let sep_width = separator_width(app);
-    lines_needed(&hints, sep_width, width as usize).max(1) as u16
+    h += lines_needed(&hints, sep_width, width as usize).max(1) as u16;
+    h
 }
 
 pub fn render(f: &mut Frame, app: &App, area: Rect) {
@@ -71,6 +80,24 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
             .border_style(Style::default().fg(pal.warn))
             .style(Style::default().bg(pal.surface));
         let paragraph = Paragraph::new(Line::from(spans)).block(block);
+        f.render_widget(paragraph, area);
+        return;
+    }
+
+    // Command mode (#41)
+    if matches!(app.mode, Mode::Command) {
+        let cursor_char = if app.blink_on { app.symbols.text_cursor } else { " " };
+        let cmd_line = Line::from(vec![
+            Span::styled(" MOTHER> ", Style::default().fg(pal.text_hot).bg(pal.surface)),
+            Span::styled(app.command_state.input.clone(), Style::default().fg(pal.text_mid).bg(pal.surface)),
+            Span::styled(cursor_char, Style::default().fg(pal.text_hot).bg(pal.surface)),
+        ]);
+        let block = Block::default()
+            .borders(Borders::TOP)
+            .border_type(BorderType::Plain)
+            .border_style(Style::default().fg(pal.border_hot))
+            .style(Style::default().bg(pal.surface));
+        let paragraph = Paragraph::new(cmd_line).block(block);
         f.render_widget(paragraph, area);
         return;
     }
@@ -142,6 +169,20 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         lines.push(Line::from(current_spans));
     }
 
+    // Disk warning (#34) — flashing line
+    if let Some(warn) = &app.disk_warning {
+        if app.blink_on {
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!(" {} {} {}", app.symbols.warning, warn, app.symbols.warning),
+                    Style::default().fg(pal.warn).bg(pal.surface),
+                ),
+            ]));
+        } else {
+            lines.push(Line::from(Span::styled("", Style::default().bg(pal.surface))));
+        }
+    }
+
     let block = Block::default()
         .borders(Borders::NONE)
         .style(Style::default().bg(pal.surface));
@@ -191,6 +232,9 @@ fn collect_hints(app: &App) -> Vec<(&'static str, &'static str)> {
             h.push(("s", "sort"));
             h.push(("tab", "panel"));
             h.push(("[/]", "sidebar"));
+            h.push(("Y", "yank path"));
+            h.push(("^L", "ops log"));
+            h.push((":", "command"));
             h.push(("L", "lock"));
             h.push(("t", "theme"));
             h.push(("q", "quit"));
@@ -262,6 +306,16 @@ fn collect_hints(app: &App) -> Vec<(&'static str, &'static str)> {
                 ("^K", "kill EOL"),
                 ("esc", "exit"),
             ]
+        }
+        Mode::OpsLog => {
+            vec![
+                ("j/k", "scroll"),
+                ("g/G", "top/bottom"),
+                ("esc", "close"),
+            ]
+        }
+        Mode::Command => {
+            vec![] // rendered separately
         }
         Mode::Confirm { .. } => unreachable!(),
     }

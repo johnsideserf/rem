@@ -45,6 +45,8 @@ pub enum Mode {
     RecursiveSearch,
     BulkRename,           // editing find/replace, Tab switches fields, Enter applies
     Edit,                 // in-app text editor
+    OpsLog,               // operations log viewer (#43)
+    Command,              // MU-TH-UR command mode (#41)
 }
 
 #[derive(PartialEq, Eq, Clone)]
@@ -170,17 +172,17 @@ pub struct EditorState {
 impl EditorState {
     /// Open a file for editing. Rejects binary files and files > 1MB.
     pub fn open(path: PathBuf) -> Result<Self, String> {
-        let meta = std::fs::metadata(&path).map_err(|e| format!("CANNOT READ: {}", e))?;
+        let meta = std::fs::metadata(&path).map_err(|e| format!("ACCESS VIOLATION: {}", e))?;
         if meta.len() > 1_048_576 {
-            return Err("FILE TOO LARGE (> 1MB)".to_string());
+            return Err("ASSET EXCEEDS 1MB CLEARANCE THRESHOLD".to_string());
         }
 
-        let bytes = std::fs::read(&path).map_err(|e| format!("READ ERROR: {}", e))?;
+        let bytes = std::fs::read(&path).map_err(|e| format!("DATA RETRIEVAL FAILURE: {}", e))?;
 
         // Binary detection: check first 512 bytes for null bytes
         let check_len = bytes.len().min(512);
         if bytes[..check_len].contains(&0) {
-            return Err("BINARY FILE".to_string());
+            return Err("BINARY ASSET \u{2014} DECODE RESTRICTED".to_string());
         }
 
         let content = String::from_utf8_lossy(&bytes);
@@ -310,7 +312,7 @@ impl EditorState {
         let content = self.lines.join("\n");
         // Add trailing newline if the file has content
         let output = if content.is_empty() { content } else { format!("{}\n", content) };
-        std::fs::write(&self.path, output).map_err(|e| format!("SAVE FAILED: {}", e))?;
+        std::fs::write(&self.path, output).map_err(|e| format!("WRITE SEQUENCE ABORTED: {}", e))?;
         self.dirty = false;
         Ok(())
     }
@@ -419,6 +421,84 @@ pub struct FsEntry {
     pub is_dir: bool,
     pub size: Option<u64>,
     pub modified: Option<SystemTime>,
+    pub is_symlink: bool,
+    pub link_target: Option<String>,
+}
+
+/// Animation for file deletion corruption effect (#35).
+#[allow(dead_code)]
+pub struct PurgeAnim {
+    pub entries: Vec<String>,
+    pub tick: u16,
+    pub done: bool,
+}
+
+/// Operations log entry (#43).
+pub struct LogEntry {
+    pub timestamp: String,
+    pub action: String,
+    pub path: String,
+}
+
+/// Operations log (#43).
+pub struct OpsLog {
+    pub entries: Vec<LogEntry>,
+    pub max_entries: usize,
+}
+
+impl OpsLog {
+    pub fn new() -> Self {
+        Self { entries: Vec::new(), max_entries: 100 }
+    }
+
+    pub fn push(&mut self, action: &str, path: &str) {
+        let now = chrono_hms();
+        self.entries.push(LogEntry {
+            timestamp: now,
+            action: action.to_string(),
+            path: path.to_string(),
+        });
+        if self.entries.len() > self.max_entries {
+            self.entries.remove(0);
+        }
+    }
+}
+
+/// Get current time as HH:MM:SS string.
+fn chrono_hms() -> String {
+    let d = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = d.as_secs();
+    let h = (secs / 3600) % 24;
+    let m = (secs / 60) % 60;
+    let s = secs % 60;
+    format!("{:02}:{:02}:{:02}", h, m, s)
+}
+
+/// Tree node for tree view (#44).
+#[allow(dead_code)]
+pub struct TreeNode {
+    pub entry: FsEntry,
+    pub depth: usize,
+    pub expanded: bool,
+    pub children_loaded: bool,
+}
+
+/// Command mode state (#41).
+pub struct CommandState {
+    pub input: String,
+    pub cursor: usize,
+    pub history: Vec<String>,
+    pub history_idx: Option<usize>,
+}
+
+/// Layout hit-test areas for mouse support (#38).
+#[derive(Default, Clone)]
+#[allow(dead_code)]
+pub struct LayoutAreas {
+    pub list_area: Option<(u16, u16, u16, u16)>,     // x, y, w, h
+    pub breadcrumb_area: Option<(u16, u16, u16, u16)>,
 }
 
 pub struct PaneState {
@@ -581,6 +661,32 @@ pub struct App {
     // Phosphor trail for green CRT effect
     pub prev_cursor_pos: usize,
     pub phosphor_trail: Vec<(usize, u8)>, // (cursor index, fade frames remaining)
+    // Idle screensaver throbber
+    pub idle_throbber: Throbber,
+    // Declassification animation (#36)
+    pub declassify_tick: Option<u16>,
+    // Per-palette blink stutter counter (#37)
+    pub blink_stutter_counter: u32,
+    // Low disk warning (#34)
+    pub disk_warning: Option<String>,
+    // Delete corruption animation (#35)
+    pub purge_anim: Option<PurgeAnim>,
+    // Operations log (#43)
+    pub ops_log: OpsLog,
+    // Operations log scroll
+    pub ops_log_scroll: usize,
+    // Symlink glyph display (computed at load time) (#42)
+    // Tree view (#44)
+    pub tree_mode: bool,
+    pub tree_nodes: Vec<TreeNode>,
+    // Dual-pane diff (#45)
+    pub diff_mode: bool,
+    pub diff_sets: Option<(std::collections::HashSet<String>, std::collections::HashSet<String>)>,
+    // Mouse support (#38)
+    pub mouse_enabled: bool,
+    pub layout_areas: LayoutAreas,
+    // Command mode (#41)
+    pub command_state: CommandState,
 }
 
 impl App {
@@ -647,6 +753,25 @@ impl App {
             glitch_enabled: true,
             prev_cursor_pos: 0,
             phosphor_trail: Vec::new(),
+            idle_throbber: Throbber::new(ThrobberKind::Idle, palette.variant),
+            declassify_tick: None,
+            blink_stutter_counter: 0,
+            disk_warning: None,
+            purge_anim: None,
+            ops_log: OpsLog::new(),
+            ops_log_scroll: 0,
+            tree_mode: false,
+            tree_nodes: Vec::new(),
+            diff_mode: false,
+            diff_sets: None,
+            mouse_enabled: true,
+            layout_areas: LayoutAreas::default(),
+            command_state: CommandState {
+                input: String::new(),
+                cursor: 0,
+                history: Vec::new(),
+                history_idx: None,
+            },
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);
@@ -665,9 +790,59 @@ impl App {
 
     pub fn tick(&mut self) {
         let now = Instant::now();
-        if now.duration_since(self.last_blink).as_millis() >= 550 {
-            self.blink_on = !self.blink_on;
+        let blink_interval = self.palette.blink_interval_ms as u128;
+        if now.duration_since(self.last_blink).as_millis() >= blink_interval {
+            // Amber stutter: skip one toggle every 7th cycle (#37)
+            let should_skip = if matches!(self.palette.variant, crate::throbber::PaletteVariant::Amber) {
+                self.blink_stutter_counter += 1;
+                self.blink_stutter_counter % 7 == 0
+            } else {
+                false
+            };
+            if !should_skip {
+                self.blink_on = !self.blink_on;
+            }
             self.last_blink = now;
+        }
+        // Declassification animation (#36)
+        if let Some(ref mut tick) = self.declassify_tick {
+            *tick += 1;
+            if *tick > 5 {
+                self.declassify_tick = None;
+            }
+        }
+        // Purge animation (#35)
+        let mut clear_purge = false;
+        if let Some(ref mut anim) = self.purge_anim {
+            anim.tick += 1;
+            if anim.tick > 8 {
+                anim.done = true;
+                clear_purge = true;
+            }
+        }
+        if clear_purge {
+            self.purge_anim = None;
+        }
+        // Low disk warning (#34)
+        if self.show_telemetry {
+            if let Some(mon) = &self.sysmon {
+                let mut warning = None;
+                for disk in &mon.disk_info {
+                    if disk.total > 0 {
+                        let pct = (disk.used as f64 / disk.total as f64 * 100.0) as u64;
+                        if pct >= 90 {
+                            warning = Some(format!(
+                                "STORAGE CRITICAL \u{2014} {} AT {}% \u{2014} PURGE NON-ESSENTIAL ASSETS",
+                                disk.mount, pct
+                            ));
+                            break;
+                        }
+                    }
+                }
+                self.disk_warning = warning;
+            }
+        } else {
+            self.disk_warning = None;
         }
         if let Some((_, ts)) = &self.error {
             if now.duration_since(*ts).as_secs() >= 3 {
@@ -736,6 +911,17 @@ impl App {
             throb.tick();
         }
         self.heartbeat.tick();
+        // CPU-modulated heartbeat: speed up under load when telemetry is active
+        if let Some(mon) = &self.sysmon {
+            let cpu = mon.cpu_pct;
+            if cpu > 80.0 {
+                self.heartbeat.extra_ticks(2);
+            } else if cpu > 50.0 {
+                self.heartbeat.extra_ticks(1);
+            }
+        }
+        // Idle screensaver throbber
+        self.idle_throbber.tick();
         // Border pulse (#18)
         self.border_pulse_tick = self.border_pulse_tick.wrapping_add(1);
         // I/O flash countdown (#16)
@@ -776,7 +962,7 @@ impl App {
                         hash_done = true;
                     }
                     HashMessage::Error(e) => {
-                        self.error = Some((format!("HASH FAILED: {}", e), Instant::now()));
+                        self.error = Some((format!("HASH VERIFICATION FAILURE: {}", e), Instant::now()));
                         hash_done = true;
                     }
                 }
@@ -796,7 +982,7 @@ impl App {
                         scan_done = true;
                     }
                     DiskScanMessage::Error(e) => {
-                        self.error = Some((format!("SCAN FAILED: {}", e), Instant::now()));
+                        self.error = Some((format!("SCAN SEQUENCE FAILURE: {}", e), Instant::now()));
                         scan_done = true;
                     }
                 }
@@ -848,6 +1034,8 @@ impl App {
                 is_dir: ae.is_dir,
                 size: if ae.is_dir { None } else { Some(ae.size) },
                 modified: None,
+                is_symlink: false,
+                link_target: None,
             }).collect();
             pane.cursor = 0;
             pane.scroll_offset = 0;

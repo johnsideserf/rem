@@ -29,6 +29,7 @@ pub struct SysMon {
     pub disk_info: Vec<DiskInfo>,
     pub net: NetSnapshot,
     pub cpu_pct: f32,
+    pub cpu_history: Vec<f32>,
     pub mem_used: u64,
     pub mem_total: u64,
     last_refresh: Instant,
@@ -51,6 +52,7 @@ impl SysMon {
             disks,
             networks,
             disk_info: Vec::new(),
+            cpu_history: vec![0.0; SPARKLINE_LEN],
             net: NetSnapshot {
                 tx_bytes_sec: 0.0,
                 rx_bytes_sec: 0.0,
@@ -106,6 +108,10 @@ impl SysMon {
         self.sys.refresh_cpu_all();
         self.sys.refresh_memory();
         self.cpu_pct = self.sys.global_cpu_usage();
+        self.cpu_history.push(self.cpu_pct);
+        if self.cpu_history.len() > SPARKLINE_LEN {
+            self.cpu_history.remove(0);
+        }
         self.mem_used = self.sys.used_memory();
         self.mem_total = self.sys.total_memory();
     }
@@ -215,6 +221,43 @@ pub fn format_throughput(bytes_sec: f64) -> String {
         format!("{:.1} KB/s", bytes_sec / 1024.0)
     } else {
         format!("{:.1} MB/s", bytes_sec / (1024.0 * 1024.0))
+    }
+}
+
+/// Render a CPU history sparkline using palette-appropriate characters.
+/// Unlike network sparklines, CPU uses a fixed 0-100 scale.
+pub fn cpu_sparkline_str(values: &[f32], variant: PaletteVariant) -> String {
+    if values.is_empty() {
+        return String::new();
+    }
+    let max = 100.0_f64;
+
+    match variant {
+        PaletteVariant::Green => {
+            const BRAILLE: &[char] = &[' ', '⡀', '⡄', '⡆', '⡇', '⣇', '⣧', '⣷', '⣿'];
+            values.iter().map(|&v| {
+                let idx = ((v as f64 / max) * 8.0).round() as usize;
+                BRAILLE[idx.min(BRAILLE.len() - 1)]
+            }).collect()
+        }
+        PaletteVariant::Amber => {
+            const GLITCH: &[char] = &[' ', '⠁', '⠃', '⠇', '⡇', '⡏', '⡟', '⡿', '⣿'];
+            values.iter().enumerate().map(|(i, &v)| {
+                if i % 7 == 3 {
+                    ' '
+                } else {
+                    let idx = ((v as f64 / max) * 8.0).round() as usize;
+                    GLITCH[idx.min(GLITCH.len() - 1)]
+                }
+            }).collect()
+        }
+        PaletteVariant::Cyan => {
+            const BLOCKS: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+            values.iter().map(|&v| {
+                let idx = ((v as f64 / max) * 8.0).round() as usize;
+                BLOCKS[idx.min(BLOCKS.len() - 1)]
+            }).collect()
+        }
     }
 }
 

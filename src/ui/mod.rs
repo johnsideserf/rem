@@ -90,6 +90,9 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     } else if app.mode == crate::app::Mode::RecursiveSearch {
         list::render_rsearch(f, app, outer[2]);
     } else {
+        // Store list area for mouse hit-testing (#38)
+        app.layout_areas.list_area = Some((outer[2].x, outer[2].y, outer[2].width, outer[2].height));
+
         // Right panel visibility: show if wide enough AND not Hidden
         let show_right = area.width >= 100 && !matches!(app.right_panel, RightPanel::Hidden);
         if show_right {
@@ -130,6 +133,11 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
 
     if app.mode == crate::app::Mode::BulkRename {
         render_bulk_rename(f, app, area);
+    }
+
+    // Operations log overlay (#43)
+    if app.mode == crate::app::Mode::OpsLog {
+        render_ops_log(f, app, area);
     }
 
     // Idle overlay (#17)
@@ -249,6 +257,11 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
         render_bulk_rename(f, app, area);
     }
 
+    // Operations log overlay (#43)
+    if app.mode == crate::app::Mode::OpsLog {
+        render_ops_log(f, app, area);
+    }
+
     // Idle overlay (#17)
     if app.idle_active {
         render_idle_overlay(f, app, area);
@@ -340,6 +353,65 @@ fn render_bulk_rename(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(pal.border_hot))
+        .style(Style::default().bg(pal.bg));
+
+    let paragraph = Paragraph::new(lines).block(block);
+    f.render_widget(paragraph, popup);
+}
+
+/// Render operations log popup (#43).
+fn render_ops_log(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+    use ratatui::text::{Line, Span};
+    use ratatui::widgets::{Borders, BorderType, Clear, Paragraph};
+
+    let pal = app.palette;
+    let popup_w = 70u16.min(area.width.saturating_sub(4));
+    let popup_h = 20u16.min(area.height.saturating_sub(4));
+    let x = area.x + (area.width.saturating_sub(popup_w)) / 2;
+    let y = area.y + (area.height.saturating_sub(popup_h)) / 2;
+    let popup = ratatui::layout::Rect::new(x, y, popup_w, popup_h);
+
+    f.render_widget(Clear, popup);
+
+    let mut lines: Vec<Line> = Vec::new();
+    lines.push(Line::from(Span::styled(
+        " O P E R A T I O N S   L O G",
+        Style::default().fg(pal.text_hot).bg(pal.bg),
+    )));
+    lines.push(Line::from(Span::raw("")));
+
+    let inner_h = popup_h.saturating_sub(4) as usize;
+    if app.ops_log.entries.is_empty() {
+        lines.push(Line::from(Span::styled(
+            " NO OPERATIONS RECORDED",
+            Style::default().fg(pal.text_dim).bg(pal.bg),
+        )));
+    } else {
+        let start = app.ops_log_scroll;
+        let end = (start + inner_h).min(app.ops_log.entries.len());
+        for entry in &app.ops_log.entries[start..end] {
+            let inner_w = popup_w.saturating_sub(4) as usize;
+            let line_str = format!(
+                " [{}] {:>6}  {}",
+                entry.timestamp, entry.action, entry.path
+            );
+            let truncated = if line_str.chars().count() > inner_w {
+                let t: String = line_str.chars().take(inner_w.saturating_sub(1)).collect();
+                format!("{}\u{2026}", t)
+            } else {
+                line_str
+            };
+            lines.push(Line::from(Span::styled(
+                truncated,
+                Style::default().fg(pal.text_mid).bg(pal.bg),
+            )));
+        }
+    }
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Plain)
         .border_style(Style::default().fg(pal.border_hot))
         .style(Style::default().bg(pal.bg));
 
@@ -445,9 +517,9 @@ fn render_idle_overlay(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         }
     }
 
-    // AWAITING INPUT message
+    // AWAITING INPUT message with per-palette idle throbber
     let msg = "AWAITING INPUT...";
-    let throbber = app.heartbeat.frame();
+    let throbber = app.idle_throbber.frame();
     let msg_line = Line::from(vec![
         Span::styled(
             format!("{} {}", throbber, msg),

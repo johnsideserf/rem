@@ -32,6 +32,49 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         Style::default().fg(pal.text_dim).bg(pal.bg),
     )));
 
+    // Declassification overlay (#36)
+    if let Some(tick) = app.declassify_tick {
+        if tick <= 5 {
+            lines.push(Line::from(Span::styled(
+                " DECLASSIFYING...",
+                Style::default().fg(pal.text_hot).bg(pal.bg),
+            )));
+            let reveal_pct = tick as f32 / 5.0;
+            const SCRAMBLE_CHARS: &[char] = &['\u{2591}', '\u{2592}', '\u{2593}', '\u{2588}', '\u{2580}', '\u{2584}'];
+            // Fill remaining lines with scrambled/revealing content
+            for row in 0..height.saturating_sub(2) {
+                let mut row_str = String::new();
+                for col in 0..width.saturating_sub(1) {
+                    let reveal_col = (reveal_pct * width as f32) as usize;
+                    if col < reveal_col {
+                        row_str.push(' ');
+                    } else {
+                        let idx = ((row * 7 + col * 13 + tick as usize * 3) % SCRAMBLE_CHARS.len()) as usize;
+                        row_str.push(SCRAMBLE_CHARS[idx]);
+                    }
+                }
+                lines.push(Line::from(Span::styled(
+                    format!(" {}", row_str),
+                    Style::default().fg(pal.text_dim).bg(pal.bg),
+                )));
+            }
+
+            // Pad and render
+            let full_height = area.height as usize;
+            while lines.len() < full_height {
+                lines.push(Line::from(Span::styled("", Style::default().bg(pal.bg))));
+            }
+            let block = Block::default()
+                .borders(Borders::LEFT)
+                .border_type(BorderType::Plain)
+                .border_style(Style::default().fg(pal.border_dim))
+                .style(Style::default().bg(pal.bg));
+            let paragraph = Paragraph::new(lines).block(block);
+            f.render_widget(paragraph, area);
+            return;
+        }
+    }
+
     // Load preview for current entry
     if let Some(entry) = app.current_entry() {
         if entry.is_dir {
@@ -108,6 +151,20 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
                         format!(" ERR: {}", e),
                         Style::default().fg(pal.warn).bg(pal.bg),
                     )));
+                }
+                PreviewContent::Image { width: img_w, height: img_h, format: fmt, braille: braille_lines } => {
+                    lines.push(Line::from(Span::styled(
+                        format!(" IMAGE: {}x{} {}", img_w, img_h, fmt),
+                        Style::default().fg(pal.text_mid).bg(pal.bg),
+                    )));
+                    lines.push(Line::from(Span::raw("")));
+                    for line in braille_lines.iter().skip(app.preview_scroll).take(height.saturating_sub(3)) {
+                        let display = format!(" {}", truncate_chars(line, width.saturating_sub(1)));
+                        lines.push(Line::from(Span::styled(
+                            display,
+                            Style::default().fg(pal.text_mid).bg(pal.bg),
+                        )));
+                    }
                 }
             }
         }

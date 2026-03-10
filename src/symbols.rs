@@ -114,6 +114,12 @@ pub struct SymbolSet {
     // Throbber / heartbeat frames
     pub throbber_frames: &'static [&'static str],
     pub heartbeat_frames: &'static [&'static str],
+    // Tree view glyphs (#44)
+    pub tree_branch: &'static str,
+    pub tree_last: &'static str,
+    pub tree_pipe: &'static str,
+    // Symlink glyph (#42)
+    pub link: &'static str,
 }
 
 impl SymbolSet {
@@ -161,6 +167,10 @@ pub fn standard() -> SymbolSet {
         git_dirty: "\u{25c6}",   // ◆
         throbber_frames: &["\u{2801}", "\u{2809}", "\u{2819}", "\u{2818}", "\u{2838}", "\u{2834}", "\u{2826}", "\u{2827}", "\u{2807}", "\u{280f}"],
         heartbeat_frames: &["\u{00b7}", "\u{2219}", "\u{2022}", "\u{25cf}", "\u{2022}", "\u{2219}", "\u{00b7}"],
+        tree_branch: "\u{251c}\u{2500}",
+        tree_last: "\u{2514}\u{2500}",
+        tree_pipe: "\u{2502} ",
+        link: "\u{21e2}",
     }
 }
 
@@ -195,6 +205,10 @@ pub fn ascii() -> SymbolSet {
         git_dirty: "*",
         throbber_frames: &["|", "/", "-", "\\"],
         heartbeat_frames: &[".", "o", "O", "o", ".", " "],
+        tree_branch: "|-",
+        tree_last: "`-",
+        tree_pipe: "| ",
+        link: "->",
     }
 }
 
@@ -229,6 +243,10 @@ pub fn block() -> SymbolSet {
         git_dirty: "\u{2588}",       // █
         throbber_frames: &["\u{2591}", "\u{2592}", "\u{2593}", "\u{2588}", "\u{2593}", "\u{2592}"],
         heartbeat_frames: &["\u{2581}", "\u{2582}", "\u{2583}", "\u{2584}", "\u{2585}", "\u{2586}", "\u{2587}", "\u{2588}", "\u{2587}", "\u{2586}", "\u{2585}", "\u{2584}", "\u{2583}", "\u{2582}", "\u{2581}"],
+        tree_branch: "\u{2588}\u{2500}",
+        tree_last: "\u{2584}\u{2500}",
+        tree_pipe: "\u{2588} ",
+        link: "\u{25b6}",
     }
 }
 
@@ -263,6 +281,10 @@ pub fn minimal() -> SymbolSet {
         git_dirty: "\u{2022}",       // •
         throbber_frames: &["\u{00b7}", " ", "\u{2022}", " ", "\u{25cf}", " ", "\u{2022}", " ", "\u{00b7}"],
         heartbeat_frames: &["\u{00b7}", "\u{2022}", "\u{25cf}", "\u{2022}", "\u{00b7}", " "],
+        tree_branch: "\u{203a}\u{2013}",
+        tree_last: "\u{203a}\u{2013}",
+        tree_pipe: "\u{00b7} ",
+        link: "\u{203a}",
     }
 }
 
@@ -297,6 +319,10 @@ pub fn pipeline() -> SymbolSet {
         git_dirty: "\u{25c8}",       // ◈
         throbber_frames: &["\u{2574}", "\u{2578}", "\u{2576}", "\u{257a}"],
         heartbeat_frames: &["\u{25c6}", "\u{25c7}", "\u{25c6}", "\u{25c7}", "\u{25c6}", " "],
+        tree_branch: "\u{2560}\u{2550}",
+        tree_last: "\u{255a}\u{2550}",
+        tree_pipe: "\u{2551} ",
+        link: "\u{25b7}",
     }
 }
 
@@ -331,6 +357,10 @@ pub fn braille() -> SymbolSet {
         git_dirty: "\u{2836}",       // ⠶
         throbber_frames: &["\u{280b}", "\u{2819}", "\u{2839}", "\u{2838}", "\u{283c}", "\u{2834}", "\u{2826}", "\u{2827}", "\u{2807}", "\u{280f}"],
         heartbeat_frames: &["\u{283f}", "\u{2837}", "\u{2836}", "\u{2826}", "\u{2836}", "\u{2837}"],
+        tree_branch: "\u{2847}\u{28c0}",
+        tree_last: "\u{2840}\u{28c0}",
+        tree_pipe: "\u{2847} ",
+        link: "\u{2836}",
     }
 }
 
@@ -365,5 +395,9 @@ pub fn scanline() -> SymbolSet {
         git_dirty: "\u{25c9}",       // ◉
         throbber_frames: &["\u{25ae}", "\u{25af}", "\u{25ae}", "\u{25af}"],
         heartbeat_frames: &["\u{25c9}", "\u{25ce}", "\u{25c9}", "\u{25ce}", "\u{25c9}", " "],
+        tree_branch: "\u{254c}\u{254c}",
+        tree_last: "\u{254c}\u{254c}",
+        tree_pipe: "\u{22ee} ",
+        link: "\u{25b8}",
     }
 }

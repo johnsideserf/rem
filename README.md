@@ -57,22 +57,27 @@ A corporate-grade terminal file navigator built in Rust with [ratatui](https://r
 - **Git integration** -- current branch and dirty status displayed in header
 - **Nerd Font icons** -- extension-based file icons with fallback for standard terminals
 - **Symbol sets** -- 7 swappable glyph styles via theme picker (Standard, ASCII, Block, Minimal, Pipeline, Braille, Scanline)
-- **System telemetry** -- `` ` `` to monitor CPU, RAM, disk, and network diagnostics
+- **System telemetry** -- `` ` `` to monitor CPU, RAM, disk, and network diagnostics with braille sparklines
+- **CPU-driven heartbeat** -- header heartbeat speeds up proportionally to CPU load when telemetry is active
+- **Network uplink indicator** -- animated braille glyph in the header tied to real-time network throughput
 - **Display profiles** -- `t` to open the theme and symbol set selector
 - **Sidebar adjustment** -- `[` / `]` to resize the sidebar panel
 - **File integrity** -- `#` to compute SHA-256 hash of selected file
 - **Disk usage** -- `W` to scan recursive directory size allocation
 - **Archive browsing** -- inspect zip/tar contents as a virtual read-only directory
-- **Lock screen** -- `L` to activate per-palette animated screensaver
+- **Lock screen** -- `L` to activate per-palette animated screensaver with braille art
 - **Boot sequence** -- per-palette corporate authentication splash with animated WY mark
+- **Per-palette throbbers** -- 5 throbber types (DataStream, Processing, Heartbeat, Scanning, Idle) with unique frame sets per display profile
 
 ### Display Profiles
 
-| Profile | Designation | Deployment |
-|---------|-------------|------------|
-| **PHOSPHOR GREEN** | WY-CRT-01 | Ship terminals (Nostromo, Sulaco) |
-| **AMBER** | WY-CRT-02 | Colony terminals (Hadley's Hope) |
-| **CORPORATE CYAN** | WY-CRT-03 | Executive consoles, MedPods |
+| Profile | Designation | Deployment | CRT Effects |
+|---------|-------------|------------|-------------|
+| **PHOSPHOR GREEN** | WY-CRT-01 | Ship terminals (Nostromo, Sulaco) | Scan line shimmer, phosphor persistence trail |
+| **AMBER** | WY-CRT-02 | Colony terminals (Hadley's Hope) | Signal degradation, character corruption, glitch lines |
+| **CORPORATE CYAN** | WY-CRT-03 | Executive consoles, MedPods | Rare thermal flicker, cursor bloom |
+
+Each profile includes unique throbber animations (radar/seismograph/diamond scanning indicators, signal ping/warning strobe/access pulse idle throbbers), per-palette braille sparklines in telemetry, and themed boot sequences.
 
 ### Command Reference
 

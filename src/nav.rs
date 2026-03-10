@@ -23,16 +23,31 @@ impl App {
         match std::fs::read_dir(&pane.current_dir) {
             Ok(rd) => {
                 for entry in rd.flatten() {
+                    // Use symlink_metadata to detect symlinks (#42)
+                    let sym_meta = entry.path().symlink_metadata().ok();
+                    let is_symlink = sym_meta.as_ref().map_or(false, |m| m.file_type().is_symlink());
+                    let link_target = if is_symlink {
+                        std::fs::read_link(entry.path())
+                            .ok()
+                            .map(|t| t.to_string_lossy().into_owned())
+                    } else {
+                        None
+                    };
+                    // Follow the link for actual metadata
                     let meta = entry.metadata().ok();
                     let is_dir = meta.as_ref().map_or(false, |m| m.is_dir());
                     let size = meta.as_ref().and_then(|m| if !m.is_dir() { Some(m.len()) } else { None });
                     let modified = meta.as_ref().and_then(|m| m.modified().ok());
+                    // Detect broken symlinks
+                    let broken = is_symlink && meta.is_none();
                     pane.entries.push(FsEntry {
                         name: entry.file_name().to_string_lossy().into_owned(),
                         path: entry.path(),
-                        is_dir,
+                        is_dir: if broken { false } else { is_dir },
                         size,
                         modified,
+                        is_symlink,
+                        link_target,
                     });
                 }
                 // Sort: dirs first, then by current sort mode
@@ -60,7 +75,7 @@ impl App {
                 });
             }
             Err(e) => {
-                self.error = Some((format!("CANNOT READ: {}", e), Instant::now()));
+                self.error = Some((format!("ACCESS DENIED \u{2014} MANIFEST UNREADABLE: {}", e), Instant::now()));
             }
         }
         self.rebuild_filtered();
@@ -113,6 +128,19 @@ impl App {
         }
         pane.nav_history.push(dir);
         pane.nav_history_cursor = pane.nav_history.len() - 1;
+        // Recompute diff sets on navigation (#45)
+        if self.diff_mode && self.dual_pane {
+            let left_names: std::collections::HashSet<String> = self.panes[0].entries.iter()
+                .map(|e| e.name.clone()).collect();
+            let right_names: std::collections::HashSet<String> = self.panes[1].entries.iter()
+                .map(|e| e.name.clone()).collect();
+            self.diff_sets = Some((left_names, right_names));
+        }
+        // Rebuild tree if tree mode active (#44)
+        if self.tree_mode {
+            self.tree_mode = false;
+            self.tree_nodes.clear();
+        }
     }
 
     pub fn go_parent(&mut self) {
@@ -326,13 +354,13 @@ impl App {
             if !dir.exists() {
                 self.marks.remove(&c);
                 crate::marks::save_marks(&self.marks);
-                self.error = Some((format!("MARK '{}' PATH NO LONGER EXISTS", c), Instant::now()));
+                self.error = Some((format!("MARK '{}' \u{2014} ASSET PATH DELISTED FROM MANIFEST", c), Instant::now()));
                 return;
             }
             self.last_dir_before_jump = Some(self.pane().current_dir.clone());
             self.navigate_to(dir);
         } else {
-            self.error = Some((format!("MARK '{}' NOT SET", c), Instant::now()));
+            self.error = Some((format!("MARK '{}' \u{2014} DESIGNATION NOT REGISTERED", c), Instant::now()));
         }
     }
     /// Walk the current directory tree and populate rsearch_paths.
@@ -417,7 +445,7 @@ impl App {
         let path = entry.path.clone();
 
         if self.hash_op.is_some() {
-            self.error = Some(("HASH ALREADY IN PROGRESS".to_string(), Instant::now()));
+            self.error = Some(("HASH SEQUENCE ACTIVE \u{2014} AWAIT COMPLETION".to_string(), Instant::now()));
             return;
         }
 
@@ -428,7 +456,7 @@ impl App {
         self.hash_op = Some(HashOp {
             path: path.clone(),
             progress: 0.0,
-            throbber: Throbber::new(ThrobberKind::Processing, variant),
+            throbber: Throbber::new(ThrobberKind::Scanning, variant),
             receiver: rx,
         });
 
@@ -490,7 +518,7 @@ impl App {
 
     fn start_disk_scan(&mut self, path: PathBuf, dir_name: String) {
         if self.disk_scan.is_some() {
-            self.error = Some(("SCAN ALREADY IN PROGRESS".to_string(), Instant::now()));
+            self.error = Some(("SCAN SEQUENCE ACTIVE \u{2014} AWAIT COMPLETION".to_string(), Instant::now()));
             return;
         }
 
@@ -500,7 +528,7 @@ impl App {
         self.disk_scan = Some(DiskScanOp {
             dir_name: dir_name.clone(),
             nodes: 0,
-            throbber: Throbber::new(ThrobberKind::DataStream, variant),
+            throbber: Throbber::new(ThrobberKind::Scanning, variant),
             receiver: rx,
         });
 

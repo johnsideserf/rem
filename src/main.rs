@@ -17,7 +17,7 @@ mod ui;
 use std::io;
 use std::time::Duration;
 
-use crossterm::event::{self, Event, KeyEventKind};
+use crossterm::event::{self, Event, KeyEventKind, MouseEvent, MouseEventKind, MouseButton, EnableMouseCapture, DisableMouseCapture};
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::execute;
 use ratatui::backend::CrosstermBackend;
@@ -42,6 +42,7 @@ fn main() -> io::Result<()> {
                 println!("  --amber     Amber colony terminal profile");
                 println!("  --cyan      Corporate cyan profile");
                 println!("  --no-boot   Skip boot sequence");
+                println!("  --no-mouse  Disable mouse support");
                 println!("  --help      Show this message");
                 println!("  --version   Show version");
                 std::process::exit(0);
@@ -63,6 +64,7 @@ fn main() -> io::Result<()> {
     app.sort_mode = cfg.sort_mode;
     app.reduce_motion = cfg.reduce_motion;
     app.glitch_enabled = cfg.glitch_enabled;
+    app.mouse_enabled = cfg.mouse_enabled;
     app.load_entries(); // re-sort with configured sort mode
 
     // Show config warnings
@@ -76,7 +78,11 @@ fn main() -> io::Result<()> {
     // Setup terminal
     terminal::enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    if cfg.mouse_enabled {
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    } else {
+        execute!(stdout, EnterAlternateScreen)?;
+    }
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -89,7 +95,11 @@ fn main() -> io::Result<()> {
 
     // Teardown
     terminal::disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    if cfg.mouse_enabled {
+        execute!(terminal.backend_mut(), DisableMouseCapture, LeaveAlternateScreen)?;
+    } else {
+        execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    }
 
     // Save bookmarks
     marks::save_marks(&app.marks);
@@ -117,29 +127,67 @@ fn run_loop(
         terminal.draw(|f| ui::render(f, app))?;
 
         if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind != KeyEventKind::Press {
-                    continue;
-                }
-                // Reset idle timer on any input (#17)
-                app.last_input = std::time::Instant::now();
-                app.idle_active = false;
-                app.idle_locked = false;
-                input::handle_key(app, key);
+            match event::read()? {
+                Event::Key(key) => {
+                    if key.kind != KeyEventKind::Press {
+                        continue;
+                    }
+                    // Reset idle timer on any input (#17)
+                    app.last_input = std::time::Instant::now();
+                    app.idle_active = false;
+                    app.idle_locked = false;
+                    input::handle_key(app, key);
 
-                if app.should_quit {
-                    return Ok(None);
+                    if app.should_quit {
+                        return Ok(None);
+                    }
+                    if let Some(path) = app.selected_path.take() {
+                        return Ok(Some(path));
+                    }
+                    if let Some(req) = app.open_request.take() {
+                        handle_open(terminal, app, req)?;
+                    }
                 }
-                if let Some(path) = app.selected_path.take() {
-                    return Ok(Some(path));
+                Event::Mouse(mouse) if app.mouse_enabled => {
+                    app.last_input = std::time::Instant::now();
+                    app.idle_active = false;
+                    app.idle_locked = false;
+                    handle_mouse(app, mouse);
                 }
-                if let Some(req) = app.open_request.take() {
-                    handle_open(terminal, app, req)?;
-                }
+                _ => {}
             }
         }
 
         app.tick();
+    }
+}
+
+/// Handle mouse events (#38).
+fn handle_mouse(app: &mut App, mouse: MouseEvent) {
+    match mouse.kind {
+        MouseEventKind::ScrollUp => {
+            app.cursor_up();
+        }
+        MouseEventKind::ScrollDown => {
+            app.cursor_down();
+        }
+        MouseEventKind::Down(MouseButton::Left) => {
+            // Click to select in file list area
+            if let Some((lx, ly, _lw, lh)) = app.layout_areas.list_area {
+                let mx = mouse.column;
+                let my = mouse.row;
+                if mx >= lx && my >= ly && my < ly + lh {
+                    let row = (my - ly) as usize;
+                    let target = app.pane().scroll_offset + row;
+                    if target < app.pane().filtered_indices.len() {
+                        app.pane_mut().cursor = target;
+                        app.preview_scroll = 0;
+                        app.declassify_tick = Some(0);
+                    }
+                }
+            }
+        }
+        _ => {}
     }
 }
 
@@ -188,13 +236,21 @@ fn handle_open(
         OpenRequest::Editor(_) => {
             // Suspend TUI
             terminal::disable_raw_mode()?;
-            execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+            if app.mouse_enabled {
+                execute!(terminal.backend_mut(), DisableMouseCapture, LeaveAlternateScreen)?;
+            } else {
+                execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+            }
 
             let result = cmd.status();
 
             // Restore TUI
             terminal::enable_raw_mode()?;
-            execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+            if app.mouse_enabled {
+                execute!(terminal.backend_mut(), EnterAlternateScreen, EnableMouseCapture)?;
+            } else {
+                execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+            }
             terminal.clear()?;
 
             if let Err(e) = result {

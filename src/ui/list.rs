@@ -33,7 +33,11 @@ fn trunc_pad(s: &str, max_chars: usize, pad_to: usize) -> String {
 
 
 pub fn render(f: &mut Frame, app: &App, area: Rect) {
-    render_pane(f, app, app.active_pane, area);
+    if app.tree_mode && !app.tree_nodes.is_empty() {
+        render_tree(f, app, area);
+    } else {
+        render_pane(f, app, app.active_pane, area);
+    }
 }
 
 pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
@@ -93,6 +97,10 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
         let is_fuzzy_match = !pane.fuzzy_query.is_empty();
 
         let row_bg_base = if is_cursor { pal.surface } else { pal.bg };
+        // Purge animation (#35) — corrupt characters for entries being deleted
+        let is_purging = app.purge_anim.as_ref()
+            .map_or(false, |a| a.entries.contains(&entry.name));
+
         let text_color_base = if is_cursor {
             pal.text_hot
         } else if is_cut {
@@ -165,7 +173,23 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
         // Name — check for Rename/Create mode inline editing
         let is_rename_row = is_active && is_cursor && app.mode == Mode::Rename;
 
-        if is_rename_row {
+        if is_purging {
+            // Purge corruption effect (#35)
+            let tick = app.purge_anim.as_ref().map_or(0, |a| a.tick);
+            const CORRUPT: &[char] = &['\u{2591}', '\u{2592}', '\u{2593}', ' '];
+            let reveal = (tick as usize * name_width / 8).min(name_width);
+            let mut corrupted = String::new();
+            for (ci, ch) in entry.name.chars().enumerate() {
+                if ci < reveal {
+                    corrupted.push(' ');
+                } else {
+                    let idx = (ci * 7 + tick as usize * 3) % CORRUPT.len();
+                    corrupted.push(if ch.is_alphanumeric() { CORRUPT[idx] } else { ch });
+                }
+            }
+            let truncated = trunc_pad(&corrupted, name_width, name_width);
+            spans.push(Span::styled(truncated, Style::default().fg(pal.warn).bg(row_bg)));
+        } else if is_rename_row {
             let cursor_char = if app.blink_on { app.symbols.text_cursor } else { " " };
             let display = format!("{}{}", app.rename_buf, cursor_char);
             let truncated = trunc_pad(&display, name_width, name_width);
@@ -228,6 +252,47 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
                     name_style = name_style.add_modifier(Modifier::ITALIC);
                 }
                 spans.push(Span::styled(truncated, name_style));
+            }
+        }
+
+        // Symlink indicator (#42)
+        if entry.is_symlink {
+            if let Some(target) = &entry.link_target {
+                // Check if target exists
+                let target_path = std::path::Path::new(target);
+                let broken = !target_path.exists() && !entry.path.exists();
+                if broken {
+                    let suffix = " \u{2192} BROKEN";
+                    let avail = name_width.saturating_sub(entry.name.len() + 1);
+                    if avail >= suffix.len() {
+                        // already rendered name, this gets appended via diff glyph area
+                    }
+                    spans.push(Span::styled(
+                        " BROKEN",
+                        Style::default().fg(pal.warn).bg(row_bg),
+                    ));
+                } else {
+                    let arrow_target = format!(" \u{21e2} {}", target);
+                    let max_t = 20usize.min(arrow_target.chars().count());
+                    let truncated_t: String = arrow_target.chars().take(max_t).collect();
+                    spans.push(Span::styled(
+                        truncated_t,
+                        Style::default().fg(pal.text_dim).bg(row_bg),
+                    ));
+                }
+            }
+        }
+
+        // Diff indicator (#45)
+        if app.diff_mode && app.dual_pane {
+            if let Some((ref left_names, ref right_names)) = app.diff_sets {
+                let other_set = if pane_idx == 0 { right_names } else { left_names };
+                let glyph = if other_set.contains(&entry.name) {
+                    Span::styled("=", Style::default().fg(pal.text_dim).bg(row_bg))
+                } else {
+                    Span::styled("+", Style::default().fg(pal.text_hot).bg(row_bg))
+                };
+                spans.push(glyph);
             }
         }
 
@@ -348,6 +413,123 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
     }
 }
 
+/// Render tree view (#44).
+fn render_tree(f: &mut Frame, app: &App, area: Rect) {
+    let pal = app.palette;
+    let sym = &app.symbols;
+    let width = area.width as usize;
+    let visible_height = area.height as usize;
+    let total = app.tree_nodes.len();
+    let pane = app.pane();
+    let cursor = pane.cursor.min(total.saturating_sub(1));
+
+    // Compute scroll offset
+    let scroll = if total <= visible_height {
+        0
+    } else if cursor < visible_height / 2 {
+        0
+    } else if cursor + visible_height / 2 >= total {
+        total.saturating_sub(visible_height)
+    } else {
+        cursor.saturating_sub(visible_height / 2)
+    };
+
+    let end = (scroll + visible_height).min(total);
+    let mut lines: Vec<Line> = Vec::new();
+
+    for vi in scroll..end {
+        let node = &app.tree_nodes[vi];
+        let is_cursor = vi == cursor;
+        let row_bg = if is_cursor { pal.surface } else { pal.bg };
+        let text_color = if is_cursor { pal.text_hot } else { pal.text_dim };
+
+        let mut spans: Vec<Span> = Vec::new();
+
+        // Indicator
+        let indicator = if is_cursor { sym.cursor } else { " " };
+        spans.push(Span::styled(indicator, Style::default().fg(pal.text_hot).bg(row_bg)));
+        spans.push(Span::styled(" ", Style::default().bg(row_bg)));
+
+        // Indentation with tree glyphs
+        let indent_width = node.depth * 2;
+        if node.depth > 0 {
+            // Leading pipe characters for depth
+            for d in 0..node.depth.saturating_sub(1) {
+                // Check if a sibling exists below at this depth — simplified: always show pipe
+                let _ = d;
+                spans.push(Span::styled(
+                    sym.tree_pipe,
+                    Style::default().fg(pal.border_dim).bg(row_bg),
+                ));
+            }
+            // Branch or last glyph
+            let is_last = {
+                let mut last = true;
+                for later in (vi + 1)..total {
+                    if app.tree_nodes[later].depth < node.depth {
+                        break;
+                    }
+                    if app.tree_nodes[later].depth == node.depth {
+                        last = false;
+                        break;
+                    }
+                }
+                last
+            };
+            let branch_glyph = if is_last { sym.tree_last } else { sym.tree_branch };
+            spans.push(Span::styled(
+                branch_glyph,
+                Style::default().fg(pal.border_dim).bg(row_bg),
+            ));
+        }
+
+        // Expand/collapse indicator for dirs
+        if node.entry.is_dir {
+            let exp = if node.expanded { "-" } else { "+" };
+            spans.push(Span::styled(
+                exp,
+                Style::default().fg(pal.text_hot).bg(row_bg),
+            ));
+        } else {
+            spans.push(Span::styled(" ", Style::default().bg(row_bg)));
+        }
+
+        // Icon
+        let icon = icon_for(&node.entry, sym);
+        spans.push(Span::styled(
+            format!("{} ", icon),
+            Style::default().fg(text_color).bg(row_bg),
+        ));
+
+        // Name
+        let name_avail = width.saturating_sub(indent_width + 5 + 3); // indicator + space + expand + icon + space
+        let display_name = if node.entry.is_dir {
+            format!("{}/", node.entry.name)
+        } else {
+            node.entry.name.clone()
+        };
+        let truncated = trunc_pad(&display_name, name_avail, name_avail);
+        spans.push(Span::styled(truncated, Style::default().fg(text_color).bg(row_bg)));
+
+        lines.push(Line::from(spans));
+    }
+
+    // Pad remaining
+    while lines.len() < visible_height {
+        lines.push(Line::from(Span::styled(
+            " ".repeat(width),
+            Style::default().bg(pal.bg),
+        )));
+    }
+
+    let block = Block::default()
+        .borders(Borders::NONE)
+        .style(Style::default().bg(pal.bg));
+
+    let paragraph = Paragraph::new(lines).block(block);
+    f.render_widget(paragraph, area);
+}
+
 /// Render the recursive search overlay (replaces the body area).
 pub fn render_rsearch(f: &mut Frame, app: &App, area: Rect) {
     let pal = app.palette;
@@ -406,6 +588,8 @@ pub fn render_rsearch(f: &mut Frame, app: &App, area: Rect) {
             is_dir,
             size: None,
             modified: None,
+            is_symlink: false,
+            link_target: None,
         };
         let icon = icon_for(&fake_entry, &app.symbols);
 

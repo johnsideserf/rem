@@ -21,15 +21,16 @@ impl App {
 
             if new_path.exists() {
                 self.error = Some((
-                    format!("NAME CONFLICT: {}", self.rename_buf),
+                    format!("DESIGNATION CONFLICT \u{2014} '{}' ALREADY ON MANIFEST", self.rename_buf),
                     Instant::now(),
                 ));
                 return;
             }
 
             if let Err(e) = std::fs::rename(&old_path, &new_path) {
-                self.error = Some((format!("RENAME FAILED: {}", e), Instant::now()));
+                self.error = Some((format!("REDESIGNATION ABORTED: {}", e), Instant::now()));
             } else {
+                self.ops_log.push("RENAME", &new_path.to_string_lossy());
                 self.load_entries();
             }
         }
@@ -43,7 +44,7 @@ impl App {
 
         if path.exists() {
             self.error = Some((
-                format!("ALREADY EXISTS: {}", self.create_buf),
+                format!("ASSET ALREADY ON MANIFEST: {}", self.create_buf),
                 Instant::now(),
             ));
             return;
@@ -56,9 +57,13 @@ impl App {
         };
 
         match result {
-            Ok(()) => self.load_entries(),
+            Ok(()) => {
+                let action = if is_dir { "MKDIR" } else { "CREATE" };
+                self.ops_log.push(action, &path.to_string_lossy());
+                self.load_entries();
+            }
             Err(e) => {
-                self.error = Some((format!("CREATE FAILED: {}", e), Instant::now()));
+                self.error = Some((format!("ASSET CREATION ABORTED: {}", e), Instant::now()));
             }
         }
     }
@@ -67,7 +72,7 @@ impl App {
         let buffer = match self.op_buffer.take() {
             Some(b) => b,
             None => {
-                self.error = Some(("BUFFER EMPTY".to_string(), Instant::now()));
+                self.error = Some(("TRANSFER BUFFER EMPTY \u{2014} NO ASSETS STAGED".to_string(), Instant::now()));
                 return;
             }
         };
@@ -83,7 +88,7 @@ impl App {
             let dest = dest_dir.join(&file_name);
             if dest.exists() {
                 self.error = Some((
-                    format!("CONFLICT: {}", file_name.to_string_lossy()),
+                    format!("MANIFEST CONFLICT \u{2014} DUPLICATE: {}", file_name.to_string_lossy()),
                     Instant::now(),
                 ));
                 self.op_buffer = Some(buffer);
@@ -115,13 +120,20 @@ impl App {
             };
 
             if let Err(e) = result {
-                self.error = Some((format!("PASTE FAILED: {}", e), Instant::now()));
+                self.error = Some((format!("ASSET TRANSFER ABORTED: {}", e), Instant::now()));
                 had_error = true;
                 break;
             }
         }
 
         if !had_error {
+            let action = match buffer.op {
+                OpType::Copy => "COPY",
+                OpType::Cut => "MOVE",
+            };
+            for src in &buffer.paths {
+                self.ops_log.push(action, &src.to_string_lossy());
+            }
             self.visual_marks.clear();
             if buffer.op == OpType::Copy {
                 self.op_buffer = Some(buffer);
@@ -190,7 +202,7 @@ impl App {
                 };
 
                 if let Err(e) = result {
-                    let _ = tx.send(OpMessage::Error(format!("PASTE FAILED: {} — {}", file_name, e)));
+                    let _ = tx.send(OpMessage::Error(format!("ASSET TRANSFER ABORTED \u{2014} {}: {}", file_name, e)));
                     return;
                 }
             }
@@ -211,9 +223,10 @@ impl App {
                             std::fs::remove_file(path)
                         };
                         if let Err(e) = result {
-                            self.error = Some((format!("DELETE FAILED: {}", e), Instant::now()));
+                            self.error = Some((format!("PURGE SEQUENCE ABORTED: {}", e), Instant::now()));
                             break;
                         }
+                        self.ops_log.push("PURGE", &path.to_string_lossy());
                     }
                     self.visual_marks.clear();
                     self.load_entries();
@@ -221,7 +234,7 @@ impl App {
             }
             PendingAction::Overwrite { src, dest } => {
                 if let Err(e) = copy_path(src, dest) {
-                    self.error = Some((format!("OVERWRITE FAILED: {}", e), Instant::now()));
+                    self.error = Some((format!("OVERWRITE SEQUENCE ABORTED: {}", e), Instant::now()));
                 }
                 self.load_entries();
             }
@@ -265,7 +278,7 @@ impl App {
                 };
 
                 if let Err(e) = result {
-                    let _ = tx.send(OpMessage::Error(format!("DELETE FAILED: {} — {}", name, e)));
+                    let _ = tx.send(OpMessage::Error(format!("PURGE SEQUENCE ABORTED \u{2014} {}: {}", name, e)));
                     return;
                 }
             }

@@ -11,6 +11,8 @@ pub enum ThrobberKind {
     DataStream,
     Processing,
     Heartbeat,
+    Scanning,
+    Idle,
 }
 
 impl ThrobberKind {
@@ -19,6 +21,8 @@ impl ThrobberKind {
             Self::DataStream => 1,
             Self::Processing => 2,
             Self::Heartbeat => 3,
+            Self::Scanning => 2,
+            Self::Idle => 4,
         }
     }
 }
@@ -50,6 +54,16 @@ const HB_GREEN: &[&str] = &["·", "∙", "•", "●", "•", "∙", "·"];
 const HB_AMBER: &[&str] = &["⡀", "⡀", "⣀", "⣠", "⣤", "⣶", "⣿", "⣶", "⣤", "⣠", "⣀", "⡀", " ", " ", "⡀"]; // gaps — colony dropout
 const HB_CYAN:  &[&str] = &["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█", "▇", "▆", "▅", "▄", "▃", "▂", "▁"]; // smooth — corporate
 
+// Scanning: active scan operations (hash, disk usage, recursive search)
+const SC_GREEN: &[&str] = &["◴", "◷", "◶", "◵"];               // radar bearing — ship navigation
+const SC_AMBER: &[&str] = &["⎽", "⎼", "⎻", "⎺", "⎻", "⎼", "⎽", " "]; // seismograph — colony geological survey
+const SC_CYAN:  &[&str] = &["◇", "◆", "◈", "◆"];               // diamond cycle — corporate precision analysis
+
+// Idle: slow pulse for screensaver AWAITING INPUT
+const ID_GREEN: &[&str] = &["·", "·", "∙", "•", "◉", "•", "∙", "·", "·", " "]; // signal ping — ship comms
+const ID_AMBER: &[&str] = &["▮", " ", " ", "▮", " ", "▮", "▯", "▯", " ", " "]; // intermittent warning strobe
+const ID_CYAN:  &[&str] = &["◻", "◻", "◼", "◼", "◻", "◻", "◼", "◼"];          // access pulse — clean toggle
+
 fn frames_for(kind: ThrobberKind, variant: PaletteVariant) -> &'static [&'static str] {
     match (kind, variant) {
         (ThrobberKind::DataStream,  PaletteVariant::Green) => DS_GREEN,
@@ -61,6 +75,12 @@ fn frames_for(kind: ThrobberKind, variant: PaletteVariant) -> &'static [&'static
         (ThrobberKind::Heartbeat,   PaletteVariant::Green) => HB_GREEN,
         (ThrobberKind::Heartbeat,   PaletteVariant::Amber) => HB_AMBER,
         (ThrobberKind::Heartbeat,   PaletteVariant::Cyan)  => HB_CYAN,
+        (ThrobberKind::Scanning,    PaletteVariant::Green) => SC_GREEN,
+        (ThrobberKind::Scanning,    PaletteVariant::Amber) => SC_AMBER,
+        (ThrobberKind::Scanning,    PaletteVariant::Cyan)  => SC_CYAN,
+        (ThrobberKind::Idle,        PaletteVariant::Green) => ID_GREEN,
+        (ThrobberKind::Idle,        PaletteVariant::Amber) => ID_AMBER,
+        (ThrobberKind::Idle,        PaletteVariant::Cyan)  => ID_CYAN,
     }
 }
 
@@ -102,6 +122,13 @@ impl Throbber {
         if self.tick_count >= self.tick_divisor {
             self.tick_count = 0;
             self.current = (self.current + 1) % self.frames.len();
+        }
+    }
+
+    /// Advance multiple ticks at once (for CPU-driven speed modulation).
+    pub fn extra_ticks(&mut self, count: u32) {
+        for _ in 0..count {
+            self.tick();
         }
     }
 

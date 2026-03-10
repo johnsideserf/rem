@@ -5,7 +5,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 
 use crate::app::App;
-use crate::sysmon::{format_capacity, format_throughput, sparkline_str};
+use crate::sysmon::{cpu_sparkline_str, format_capacity, format_throughput, sparkline_str};
 
 pub fn render(f: &mut Frame, app: &App, area: Rect) {
     if app.sysmon.is_none() {
@@ -164,6 +164,9 @@ fn render_disks_and_vitals(f: &mut Frame, app: &App, area: Rect) {
         format_capacity(sysmon.mem_total),
     );
 
+    // CPU sparkline waveform (braille-rendered history)
+    let cpu_spark = cpu_sparkline_str(&sysmon.cpu_history, pal.variant);
+
     let sym = &app.symbols;
     lines.push(Line::from(vec![
         Span::styled(" CPU ", Style::default().fg(pal.text_dim).bg(pal.bg)),
@@ -178,6 +181,11 @@ fn render_disks_and_vitals(f: &mut Frame, app: &App, area: Rect) {
         Span::styled(
             format!(" {:>3}%", cpu_pct),
             Style::default().fg(pal.text_mid).bg(pal.bg),
+        ),
+        Span::styled("  ", Style::default().bg(pal.bg)),
+        Span::styled(
+            cpu_spark,
+            Style::default().fg(cpu_color).bg(pal.bg),
         ),
         Span::styled("   MEM ", Style::default().fg(pal.text_dim).bg(pal.bg)),
         Span::styled(

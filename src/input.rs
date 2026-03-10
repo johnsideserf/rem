@@ -41,6 +41,8 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         Mode::RecursiveSearch => handle_rsearch(app, key),
         Mode::BulkRename => handle_bulk_rename(app, key),
         Mode::Edit => handle_edit(app, key),
+        Mode::OpsLog => handle_ops_log(app, key),
+        Mode::Command => handle_command(app, key),
     }
 }
 
@@ -90,22 +92,43 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
             app.should_quit = true;
         }
         (KeyModifiers::NONE, KeyCode::Char('j')) | (KeyModifiers::NONE, KeyCode::Down) => {
-            app.cursor_down();
+            if app.tree_mode {
+                let max = app.tree_nodes.len();
+                let pane = app.pane_mut();
+                if pane.cursor + 1 < max { pane.cursor += 1; }
+            } else {
+                app.cursor_down();
+            }
             app.preview_scroll = 0;
+            app.declassify_tick = Some(0);
         }
         (KeyModifiers::NONE, KeyCode::Char('k')) | (KeyModifiers::NONE, KeyCode::Up) => {
-            app.cursor_up();
+            if app.tree_mode {
+                let pane = app.pane_mut();
+                if pane.cursor > 0 { pane.cursor -= 1; }
+            } else {
+                app.cursor_up();
+            }
             app.preview_scroll = 0;
+            app.declassify_tick = Some(0);
         }
         (KeyModifiers::NONE, KeyCode::Char('l'))
         | (KeyModifiers::NONE, KeyCode::Right)
         | (KeyModifiers::NONE, KeyCode::Enter) => {
-            app.enter_selected();
+            if app.tree_mode {
+                tree_toggle_expand(app);
+            } else {
+                app.enter_selected();
+            }
         }
         (KeyModifiers::NONE, KeyCode::Char('h'))
         | (KeyModifiers::NONE, KeyCode::Left)
         | (KeyModifiers::NONE, KeyCode::Char('-')) => {
-            app.go_parent();
+            if app.tree_mode {
+                tree_collapse_or_parent(app);
+            } else {
+                app.go_parent();
+            }
         }
         (KeyModifiers::NONE, KeyCode::Char('g')) => {
             app.mode = Mode::WaitingForG;
@@ -281,8 +304,229 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
                 crate::throbber::PaletteVariant::Cyan => 2,
             };
         }
+        // Clipboard yank (#39)
+        (KeyModifiers::SHIFT, KeyCode::Char('Y')) => {
+            clipboard_yank(app);
+        }
+        // Operations log (#43)
+        (KeyModifiers::CONTROL, KeyCode::Char('l')) => {
+            app.ops_log_scroll = 0;
+            app.mode = Mode::OpsLog;
+        }
+        // Command mode (#41)
+        (KeyModifiers::SHIFT, KeyCode::Char(':'))
+        | (KeyModifiers::NONE, KeyCode::Char(':')) => {
+            app.command_state.input.clear();
+            app.command_state.cursor = 0;
+            app.command_state.history_idx = None;
+            app.mode = Mode::Command;
+        }
+        // Tree view toggle (#44)
+        (KeyModifiers::SHIFT, KeyCode::Char('T')) => {
+            app.tree_mode = !app.tree_mode;
+            if app.tree_mode {
+                build_tree(app);
+            }
+        }
+        // Dual-pane diff toggle (#45)
+        (KeyModifiers::CONTROL, KeyCode::Char('x')) => {
+            if app.dual_pane {
+                app.diff_mode = !app.diff_mode;
+                if app.diff_mode {
+                    compute_diff(app);
+                } else {
+                    app.diff_sets = None;
+                }
+            }
+        }
         _ => {}
     }
+}
+
+/// Copy current entry's full path to system clipboard (#39).
+fn clipboard_yank(app: &mut App) {
+    let path_str = match app.current_entry() {
+        Some(e) => e.path.to_string_lossy().into_owned(),
+        None => return,
+    };
+
+    let result = if cfg!(windows) {
+        std::process::Command::new("cmd")
+            .args(["/C", &format!("echo {}| clip", path_str)])
+            .output()
+    } else if cfg!(target_os = "macos") {
+        std::process::Command::new("sh")
+            .args(["-c", &format!("printf '%s' '{}' | pbcopy", path_str)])
+            .output()
+    } else {
+        std::process::Command::new("sh")
+            .args(["-c", &format!("printf '%s' '{}' | xclip -selection clipboard 2>/dev/null || printf '%s' '{}' | xsel --clipboard", path_str, path_str)])
+            .output()
+    };
+
+    match result {
+        Ok(_) => {
+            app.error = Some(("PATH COPIED TO CLIPBOARD".to_string(), Instant::now()));
+        }
+        Err(_) => {
+            app.error = Some(("CLIPBOARD ACCESS DENIED".to_string(), Instant::now()));
+        }
+    }
+}
+
+/// Build initial tree from current directory (#44).
+fn build_tree(app: &mut App) {
+    let nodes: Vec<crate::app::TreeNode> = {
+        let pane = app.pane();
+        pane.filtered_indices.iter().map(|&i| {
+            let entry = &pane.entries[i];
+            crate::app::TreeNode {
+                entry: crate::app::FsEntry {
+                    name: entry.name.clone(),
+                    path: entry.path.clone(),
+                    is_dir: entry.is_dir,
+                    size: entry.size,
+                    modified: entry.modified,
+                    is_symlink: entry.is_symlink,
+                    link_target: entry.link_target.clone(),
+                },
+                depth: 0,
+                expanded: false,
+                children_loaded: false,
+            }
+        }).collect()
+    };
+    app.tree_nodes = nodes;
+}
+
+/// Toggle expand/collapse on current tree node (#44).
+fn tree_toggle_expand(app: &mut App) {
+    let cursor = app.pane().cursor;
+    if cursor >= app.tree_nodes.len() {
+        return;
+    }
+
+    if !app.tree_nodes[cursor].entry.is_dir {
+        // For files, open as usual
+        app.enter_selected();
+        return;
+    }
+
+    if app.tree_nodes[cursor].expanded {
+        // Collapse: remove all children (nodes with depth > current that follow consecutively)
+        let depth = app.tree_nodes[cursor].depth;
+        let remove_start = cursor + 1;
+        let mut remove_end = remove_start;
+        while remove_end < app.tree_nodes.len() && app.tree_nodes[remove_end].depth > depth {
+            remove_end += 1;
+        }
+        app.tree_nodes.drain(remove_start..remove_end);
+        app.tree_nodes[cursor].expanded = false;
+    } else {
+        // Expand: load children (max depth 10)
+        let depth = app.tree_nodes[cursor].depth;
+        if depth >= 10 {
+            return;
+        }
+        let dir_path = app.tree_nodes[cursor].entry.path.clone();
+        let show_hidden = app.show_hidden;
+        let mut children: Vec<crate::app::TreeNode> = Vec::new();
+
+        if let Ok(rd) = std::fs::read_dir(&dir_path) {
+            let mut entries: Vec<crate::app::FsEntry> = Vec::new();
+            for de in rd.flatten() {
+                let name = de.file_name().to_string_lossy().into_owned();
+                if !show_hidden && name.starts_with('.') {
+                    continue;
+                }
+                let meta = std::fs::symlink_metadata(de.path());
+                let (is_dir, size, modified, is_symlink, link_target) = match &meta {
+                    Ok(m) => {
+                        let is_sym = m.file_type().is_symlink();
+                        let lt = if is_sym {
+                            std::fs::read_link(de.path()).ok().map(|p| p.to_string_lossy().into_owned())
+                        } else {
+                            None
+                        };
+                        let real_meta = std::fs::metadata(de.path());
+                        let is_d = real_meta.as_ref().map_or(m.is_dir(), |rm| rm.is_dir());
+                        let sz = if is_d { None } else { Some(real_meta.as_ref().map_or(m.len(), |rm| rm.len())) };
+                        let mt = real_meta.as_ref().ok().and_then(|rm| rm.modified().ok());
+                        (is_d, sz, mt, is_sym, lt)
+                    }
+                    Err(_) => (false, None, None, false, None),
+                };
+                entries.push(crate::app::FsEntry {
+                    name,
+                    path: de.path(),
+                    is_dir,
+                    size,
+                    modified,
+                    is_symlink,
+                    link_target,
+                });
+            }
+            // Sort: dirs first, then case-insensitive name
+            entries.sort_by(|a, b| {
+                b.is_dir.cmp(&a.is_dir)
+                    .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+            });
+            for e in entries {
+                children.push(crate::app::TreeNode {
+                    entry: e,
+                    depth: depth + 1,
+                    expanded: false,
+                    children_loaded: false,
+                });
+            }
+        }
+
+        // Insert children after current node
+        let insert_pos = cursor + 1;
+        for (i, child) in children.into_iter().enumerate() {
+            app.tree_nodes.insert(insert_pos + i, child);
+        }
+        app.tree_nodes[cursor].expanded = true;
+        app.tree_nodes[cursor].children_loaded = true;
+    }
+}
+
+/// Collapse current node or jump to parent in tree (#44).
+fn tree_collapse_or_parent(app: &mut App) {
+    let cursor = app.pane().cursor;
+    if cursor >= app.tree_nodes.len() {
+        return;
+    }
+
+    if app.tree_nodes[cursor].expanded {
+        // Collapse this node
+        tree_toggle_expand(app);
+    } else if app.tree_nodes[cursor].depth > 0 {
+        // Jump to parent node
+        let target_depth = app.tree_nodes[cursor].depth - 1;
+        for i in (0..cursor).rev() {
+            if app.tree_nodes[i].depth == target_depth {
+                app.pane_mut().cursor = i;
+                break;
+            }
+        }
+    } else {
+        // At root level, exit tree and go parent
+        app.tree_mode = false;
+        app.tree_nodes.clear();
+        app.go_parent();
+    }
+}
+
+/// Compute diff sets for dual-pane mode (#45).
+fn compute_diff(app: &mut App) {
+    let left_names: std::collections::HashSet<String> = app.panes[0].entries.iter()
+        .map(|e| e.name.clone())
+        .collect();
+    let right_names: std::collections::HashSet<String> = app.panes[1].entries.iter()
+        .map(|e| e.name.clone())
+        .collect();
+    app.diff_sets = Some((left_names, right_names));
 }
 
 fn handle_waiting_g(app: &mut App, key: KeyEvent) {
@@ -321,7 +565,7 @@ fn handle_delete_mark(app: &mut App, key: KeyEvent) {
             if app.marks.remove(&c).is_some() {
                 crate::marks::save_marks(&app.marks);
             } else {
-                app.error = Some((format!("MARK '{}' NOT SET", c), std::time::Instant::now()));
+                app.error = Some((format!("MARK '{}' \u{2014} DESIGNATION NOT REGISTERED", c), std::time::Instant::now()));
             }
         }
     }
@@ -529,6 +773,17 @@ fn handle_confirm(app: &mut App, key: KeyEvent) {
     if let Mode::Confirm { action } = &app.mode {
         let action = action.clone();
         if key.code == KeyCode::Char('y') {
+            // Start purge animation for delete actions (#35)
+            if let crate::app::PendingAction::Delete { ref paths } = action {
+                let names: Vec<String> = paths.iter()
+                    .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+                    .collect();
+                app.purge_anim = Some(crate::app::PurgeAnim {
+                    entries: names,
+                    tick: 0,
+                    done: false,
+                });
+            }
             app.execute_confirmed(&action);
         }
         // Any key (including 'y' after execution) exits confirm mode
@@ -697,7 +952,7 @@ fn handle_bulk_rename(app: &mut App, key: KeyEvent) {
 
 fn execute_bulk_rename(app: &mut App) {
     if app.bulk_find.is_empty() && !app.bulk_replace.contains("{n}") {
-        app.error = Some(("FIND PATTERN EMPTY".to_string(), Instant::now()));
+        app.error = Some(("SEARCH PATTERN UNDEFINED".to_string(), Instant::now()));
         return;
     }
 
@@ -744,12 +999,12 @@ fn execute_bulk_rename(app: &mut App) {
     }
 
     if has_conflict {
-        app.error = Some(("RENAME CONFLICT: DUPLICATE NAMES".to_string(), Instant::now()));
+        app.error = Some(("REDESIGNATION CONFLICT \u{2014} DUPLICATE NAMES DETECTED".to_string(), Instant::now()));
         return;
     }
 
     if renames.is_empty() {
-        app.error = Some(("NO CHANGES TO APPLY".to_string(), Instant::now()));
+        app.error = Some(("NO MODIFICATIONS DETECTED \u{2014} SEQUENCE CANCELLED".to_string(), Instant::now()));
         return;
     }
 
@@ -765,7 +1020,7 @@ fn execute_bulk_rename(app: &mut App) {
 
     if errors > 0 {
         app.error = Some((
-            format!("RENAMED {}, FAILED {}", success, errors),
+            format!("REDESIGNATION: {} PROCESSED, {} ABORTED", success, errors),
             Instant::now(),
         ));
     }
@@ -901,6 +1156,187 @@ fn handle_edit(app: &mut App, key: KeyEvent) {
             ed.insert_char(c);
         }
         _ => {}
+    }
+}
+
+fn handle_ops_log(app: &mut App, key: KeyEvent) {
+    match key.code {
+        KeyCode::Esc | KeyCode::Char('q') => {
+            app.mode = Mode::Normal;
+        }
+        KeyCode::Char('j') | KeyCode::Down => {
+            if app.ops_log_scroll + 1 < app.ops_log.entries.len() {
+                app.ops_log_scroll += 1;
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.ops_log_scroll = app.ops_log_scroll.saturating_sub(1);
+        }
+        KeyCode::Char('g') => {
+            app.ops_log_scroll = 0;
+        }
+        KeyCode::Char('G') => {
+            app.ops_log_scroll = app.ops_log.entries.len().saturating_sub(1);
+        }
+        _ => {}
+    }
+}
+
+fn handle_command(app: &mut App, key: KeyEvent) {
+    match (key.modifiers, key.code) {
+        (_, KeyCode::Esc) => {
+            app.mode = Mode::Normal;
+        }
+        (_, KeyCode::Enter) => {
+            let cmd = app.command_state.input.clone();
+            if !cmd.is_empty() {
+                app.command_state.history.push(cmd.clone());
+            }
+            execute_command(app, &cmd);
+            app.mode = Mode::Normal;
+        }
+        (_, KeyCode::Backspace) => {
+            if app.command_state.cursor > 0 {
+                app.command_state.cursor -= 1;
+                let byte_idx = app.command_state.input.char_indices()
+                    .nth(app.command_state.cursor)
+                    .map(|(i, _)| i)
+                    .unwrap_or(app.command_state.input.len());
+                let next_byte = app.command_state.input.char_indices()
+                    .nth(app.command_state.cursor + 1)
+                    .map(|(i, _)| i)
+                    .unwrap_or(app.command_state.input.len());
+                app.command_state.input.drain(byte_idx..next_byte);
+            }
+        }
+        (_, KeyCode::Left) => {
+            if app.command_state.cursor > 0 {
+                app.command_state.cursor -= 1;
+            }
+        }
+        (_, KeyCode::Right) => {
+            let len = app.command_state.input.chars().count();
+            if app.command_state.cursor < len {
+                app.command_state.cursor += 1;
+            }
+        }
+        (_, KeyCode::Up) => {
+            // Command history navigation
+            let hist_len = app.command_state.history.len();
+            if hist_len > 0 {
+                let idx = match app.command_state.history_idx {
+                    Some(0) => 0,
+                    Some(i) => i - 1,
+                    None => hist_len - 1,
+                };
+                app.command_state.history_idx = Some(idx);
+                app.command_state.input = app.command_state.history[idx].clone();
+                app.command_state.cursor = app.command_state.input.chars().count();
+            }
+        }
+        (_, KeyCode::Down) => {
+            if let Some(idx) = app.command_state.history_idx {
+                let hist_len = app.command_state.history.len();
+                if idx + 1 < hist_len {
+                    let new_idx = idx + 1;
+                    app.command_state.history_idx = Some(new_idx);
+                    app.command_state.input = app.command_state.history[new_idx].clone();
+                    app.command_state.cursor = app.command_state.input.chars().count();
+                } else {
+                    app.command_state.history_idx = None;
+                    app.command_state.input.clear();
+                    app.command_state.cursor = 0;
+                }
+            }
+        }
+        (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
+            app.command_state.input.clear();
+            app.command_state.cursor = 0;
+        }
+        (KeyModifiers::NONE | KeyModifiers::SHIFT, KeyCode::Char(c)) => {
+            let byte_idx = app.command_state.input.char_indices()
+                .nth(app.command_state.cursor)
+                .map(|(i, _)| i)
+                .unwrap_or(app.command_state.input.len());
+            app.command_state.input.insert(byte_idx, c);
+            app.command_state.cursor += 1;
+        }
+        _ => {}
+    }
+}
+
+fn execute_command(app: &mut App, cmd: &str) {
+    let parts: Vec<&str> = cmd.trim().splitn(2, ' ').collect();
+    match parts.first().copied() {
+        Some("q") | Some("quit") => {
+            app.should_quit = true;
+        }
+        Some("cd") => {
+            if let Some(path_str) = parts.get(1) {
+                let path = std::path::PathBuf::from(path_str.trim());
+                let resolved = if path.is_absolute() {
+                    path
+                } else {
+                    app.pane().current_dir.join(path)
+                };
+                if resolved.is_dir() {
+                    app.navigate_to(resolved);
+                } else {
+                    app.error = Some(("ASSET NOT LOCATED IN MANIFEST".to_string(), Instant::now()));
+                }
+            }
+        }
+        Some("set") => {
+            match parts.get(1).map(|s| s.trim()) {
+                Some("hidden") => { app.show_hidden = true; app.rebuild_filtered(); }
+                Some("nohidden") => { app.show_hidden = false; app.rebuild_filtered(); }
+                _ => {
+                    app.error = Some(("UNKNOWN PARAMETER".to_string(), Instant::now()));
+                }
+            }
+        }
+        Some("sort") => {
+            match parts.get(1).map(|s| s.trim()) {
+                Some("name") => { app.sort_mode = crate::app::SortMode::NameAsc; app.load_entries(); }
+                Some("size") => { app.sort_mode = crate::app::SortMode::SizeDesc; app.load_entries(); }
+                Some("date") => { app.sort_mode = crate::app::SortMode::DateNewest; app.load_entries(); }
+                _ => {
+                    app.error = Some(("VALID: sort name|size|date".to_string(), Instant::now()));
+                }
+            }
+        }
+        Some("theme") => {
+            match parts.get(1).map(|s| s.trim()) {
+                Some("green") => {
+                    app.palette = crate::palette::Palette::phosphor_green();
+                    crate::config::save_theme(app.palette.variant);
+                }
+                Some("amber") => {
+                    app.palette = crate::palette::Palette::amber();
+                    crate::config::save_theme(app.palette.variant);
+                }
+                Some("cyan") => {
+                    app.palette = crate::palette::Palette::degraded_cyan();
+                    crate::config::save_theme(app.palette.variant);
+                }
+                _ => {
+                    app.error = Some(("VALID: theme green|amber|cyan".to_string(), Instant::now()));
+                }
+            }
+        }
+        Some("symbols") => {
+            if let Some(name) = parts.get(1).map(|s| s.trim()) {
+                let variant = crate::symbols::SymbolVariant::from_config(name);
+                app.symbols = crate::symbols::SymbolSet::for_variant(variant);
+                crate::config::save_symbols(variant);
+            }
+        }
+        Some("help") => {
+            app.error = Some(("COMMANDS: q cd set sort theme symbols help".to_string(), Instant::now()));
+        }
+        _ => {
+            app.error = Some(("UNKNOWN COMMAND \u{2014} TYPE :help".to_string(), Instant::now()));
+        }
     }
 }
 
