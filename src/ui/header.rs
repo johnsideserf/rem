@@ -4,7 +4,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 
-use crate::app::App;
+use crate::app::{App, Mode};
 use crate::logo;
 
 pub fn render(f: &mut Frame, app: &App, area: Rect) {
@@ -24,9 +24,33 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         ])
         .split(area);
 
+    // Map current mode to an UPPERCASE label and color
+    let (mode_label, mode_color) = match &app.mode {
+        Mode::Normal => ("NORMAL", pal.text_mid),
+        Mode::FuzzySearch => ("FUZZY", pal.text_mid),
+        Mode::JumpKey => ("JUMP", pal.text_mid),
+        Mode::Visual => ("VISUAL", pal.text_hot),
+        Mode::Rename => ("RENAME", pal.text_mid),
+        Mode::Create { .. } => ("CREATE", pal.text_mid),
+        Mode::Confirm { .. } => ("CONFIRM", pal.text_hot),
+        Mode::WaitingForG
+        | Mode::WaitingForMark
+        | Mode::WaitingForJumpToMark
+        | Mode::WaitingForYank
+        | Mode::WaitingForCut
+        | Mode::WaitingForDeleteMark => ("NORMAL", pal.text_mid),
+        Mode::RecursiveSearch => ("SEARCH", pal.text_mid),
+        Mode::BulkRename => ("BULK-RN", pal.text_mid),
+        Mode::Edit => ("EDIT", pal.text_mid),
+        Mode::OpsLog => ("LOG", pal.text_mid),
+        Mode::Command => ("COMMAND", pal.text_mid),
+    };
+
     // Left side: status info
     let mut spans = vec![
         Span::styled(" REM", Style::default().fg(pal.text_hot).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("  {}  ", app.symbols.separator), Style::default().fg(pal.text_dim)),
+        Span::styled(format!("[{}]", mode_label), Style::default().fg(mode_color).add_modifier(Modifier::BOLD)),
         Span::styled(format!("  {}  ", app.symbols.separator), Style::default().fg(pal.text_dim)),
         Span::styled(
             if app.archive.is_some() { "ARCHIVE" } else { "FILE SYSTEM" },
