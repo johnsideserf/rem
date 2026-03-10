@@ -247,6 +247,9 @@ fn collect_hints(app: &App) -> Vec<(&'static str, &'static str)> {
             h.push(("[/]", "sidebar"));
             h.push(("Y", "yank path"));
             h.push(("^L", "ops log"));
+            if !app.undo_stack.is_empty() {
+                h.push(("^Z", "undo"));
+            }
             h.push((":", "command"));
             h.push(("^F", "fav"));
             h.push(("L", "lock"));

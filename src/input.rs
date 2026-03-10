@@ -313,6 +313,10 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
             app.ops_log_scroll = 0;
             app.mode = Mode::OpsLog;
         }
+        // Undo last file operation (#53)
+        (KeyModifiers::CONTROL, KeyCode::Char('z')) => {
+            app.undo_last();
+        }
         // Command mode (#41)
         (KeyModifiers::SHIFT, KeyCode::Char(':'))
         | (KeyModifiers::NONE, KeyCode::Char(':')) => {

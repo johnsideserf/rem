@@ -435,6 +435,14 @@ pub struct PurgeAnim {
     pub done: bool,
 }
 
+/// Undo record for file operations (#53).
+#[derive(Clone)]
+pub struct UndoRecord {
+    pub action: String,
+    pub original_paths: Vec<PathBuf>,
+    pub result_paths: Vec<PathBuf>,
+}
+
 /// Operations log entry (#43).
 pub struct LogEntry {
     pub timestamp: String,
@@ -699,6 +707,8 @@ pub struct App {
     pub favorites: Vec<PathBuf>,
     // Shell command output (#57)
     pub shell_output: Option<String>,
+    // Undo stack (#53)
+    pub undo_stack: Vec<UndoRecord>,
 }
 
 impl App {
@@ -789,6 +799,7 @@ impl App {
             },
             favorites: Vec::new(),
             shell_output: None,
+            undo_stack: Vec::new(),
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);
