@@ -266,6 +266,14 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
             }
         }
 
+        // CLASSIFIED badge (#51)
+        if entry.is_classified {
+            spans.push(Span::styled(
+                " [CLASSIFIED]",
+                Style::default().fg(pal.warn).bg(row_bg),
+            ));
+        }
+
         // Symlink indicator (#42)
         if entry.is_symlink {
             if let Some(target) = &entry.link_target {
@@ -602,6 +610,7 @@ pub fn render_rsearch(f: &mut Frame, app: &App, area: Rect) {
             is_symlink: false,
             link_target: None,
             permissions: None,
+            is_classified: false,
         };
         let icon = icon_for(&fake_entry, &app.symbols);
 

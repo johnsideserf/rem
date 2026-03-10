@@ -424,6 +424,7 @@ pub struct FsEntry {
     pub is_symlink: bool,
     pub link_target: Option<String>,
     pub permissions: Option<String>,
+    pub is_classified: bool,
 }
 
 /// Animation for file deletion corruption effect (#35).
@@ -1048,6 +1049,7 @@ impl App {
                 is_symlink: false,
                 link_target: None,
                 permissions: None,
+                is_classified: false,
             }).collect();
             pane.cursor = 0;
             pane.scroll_offset = 0;
