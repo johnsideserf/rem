@@ -68,6 +68,27 @@ impl App {
                     };
                     // Detect broken symlinks
                     let broken = is_symlink && meta.is_none();
+                    // Detect classified/sensitive files (#51)
+                    let name_lower = entry.file_name().to_string_lossy().to_lowercase();
+                    let is_classified = !is_dir && (
+                        name_lower.contains("secret") ||
+                        name_lower.contains("password") ||
+                        name_lower.contains("credential") ||
+                        name_lower.contains("token") ||
+                        name_lower == ".env" ||
+                        name_lower.starts_with(".env.") ||
+                        name_lower.ends_with(".pem") ||
+                        name_lower.ends_with(".p12") ||
+                        name_lower.ends_with(".pfx") ||
+                        name_lower.ends_with(".key") ||
+                        name_lower.contains("id_rsa") ||
+                        name_lower.contains("id_ed25519") ||
+                        name_lower.contains("id_ecdsa") ||
+                        name_lower == ".htpasswd" ||
+                        name_lower == "shadow" ||
+                        name_lower.ends_with(".keystore") ||
+                        name_lower.ends_with(".jks")
+                    );
                     pane.entries.push(FsEntry {
                         name: entry.file_name().to_string_lossy().into_owned(),
                         path: entry.path(),
@@ -77,6 +98,7 @@ impl App {
                         is_symlink,
                         link_target,
                         permissions,
+                        is_classified,
                     });
                 }
                 // Sort: dirs first, then by current sort mode

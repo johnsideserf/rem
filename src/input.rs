@@ -413,6 +413,7 @@ fn build_tree(app: &mut App) {
                     is_symlink: entry.is_symlink,
                     link_target: entry.link_target.clone(),
                     permissions: entry.permissions.clone(),
+                    is_classified: entry.is_classified,
                 },
                 depth: 0,
                 expanded: false,
@@ -489,6 +490,7 @@ fn tree_toggle_expand(app: &mut App) {
                     is_symlink,
                     link_target,
                     permissions: None,
+                    is_classified: false,
                 });
             }
             // Sort: dirs first, then case-insensitive name

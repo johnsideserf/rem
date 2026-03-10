@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo:*)",
+      "Bash(gh auth:*)",
+      "Bash(git:*)",
+      "Bash(gh repo:*)",
+      "WebFetch(domain:docs.rs)",
+      "WebFetch(domain:crates.io)",
+      "WebFetch(domain:github.com)",
+      "Bash(rustc:*)",
+      "Bash(gh issue:*)",
+      "Bash(taskkill:*)",
+      "Bash(python:*)",
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(cd \"C:\\\\Users\\\\smile\\\\projects\\\\wy-theme\\\\.claude\\\\worktrees\\\\agent-a0bdb9da\" && gh pr create --title \"Add mode indicator in header bar \\(#50\\)\" --body \"$\\(cat <<'EOF'\n## Summary\n- Display current Mode as a `[MODE_NAME]` badge in the header bar after the REM title\n- Dangerous modes \\(VISUAL, CONFIRM\\) render in `text_hot`; all others in `text_mid`\n- Waiting substates display as NORMAL\n\n## Test plan\n- [ ] Launch rem, verify `[NORMAL]` badge in header\n- [ ] Enter visual mode \\(V\\), verify `[VISUAL]` in hot color\n- [ ] Enter command mode \\(:\\), verify `[COMMAND]`\n\nCloses #50\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\nEOF\n\\)\")",
+      "Bash(cd \"C:\\\\Users\\\\smile\\\\projects\\\\wy-theme\\\\.claude\\\\worktrees\\\\agent-abbccd00\" && gh pr create --title \"Add sort mode indicator in breadcrumb bar \\(#56\\)\" --body \"$\\(cat <<'EOF'\n## Summary\n- Append sort indicator badge \\(SORT:NAME↑, SORT:SIZE↓, etc.\\) after path segments in breadcrumb\n- Uses `text_dim` color, consistent with existing breadcrumb styling\n\n## Test plan\n- [ ] Launch rem, verify sort indicator appears in breadcrumb\n- [ ] Press `s` to cycle sort modes, verify indicator updates\n\nCloses #56\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\nEOF\n\\)\")",
+      "Bash(cd \"C:\\\\Users\\\\smile\\\\projects\\\\wy-theme\\\\.claude\\\\worktrees\\\\agent-a6a4550b\" && gh pr create --title \"Add live terminal diagnostics in boot sequence \\(#52\\)\" --body \"$\\(cat <<'EOF'\n## Summary\n- Replace hardcoded MEMORY values with actual system RAM via sysinfo\n- Add CPU core count diagnostic line\n- Boot now shows real hardware diagnostics during startup animation\n\n## Test plan\n- [ ] Launch rem \\(with boot sequence\\), verify MEMORY shows real RAM\n- [ ] Verify CPU line shows actual core count\n- [ ] Test all three palettes \\(green, amber, cyan\\)\n\nCloses #52\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\nEOF\n\\)\")",
+      "Bash(cd \"C:\\\\Users\\\\smile\\\\projects\\\\wy-theme\\\\.claude\\\\worktrees\\\\agent-a6d848ff\" && gh pr create --title \"Add hex dump preview for binary files \\(#46\\)\" --body \"$\\(cat <<'EOF'\n## Summary\n- Replace bare [BINARY FILE] label with formatted hex dump of first 256 bytes\n- Each row: 8-digit offset, 16 hex bytes \\(gap at byte 8\\), ASCII column\n- Scrollable via preview_scroll; old Binary variant kept as fallback\n\n## Test plan\n- [ ] Navigate to a binary file \\(.exe, .png, compiled .o\\), verify hex dump appears\n- [ ] Verify scroll works in preview pane \\(Ctrl+J/K\\)\n- [ ] Verify text files still show syntax-highlighted preview\n\nCloses #46\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\nEOF\n\\)\")",
+      "Bash(cd \"C:\\\\Users\\\\smile\\\\projects\\\\wy-theme\\\\.claude\\\\worktrees\\\\agent-a40d2a3a\" && gh pr create --title \"Add size comparison sparkline in sidebar \\(#59\\)\" --body \"$\\(cat <<'EOF'\n## Summary\n- Add sparkline row after SIZE in sidebar SELECTION panel\n- Shows sorted size distribution of sibling files using block elements\n- Displays percentile rank \\(RANK P##\\) for the selected file\n\n## Test plan\n- [ ] Select a file in a directory with multiple files, verify sparkline appears\n- [ ] Select a file in a single-file directory, verify no sparkline\n- [ ] Verify all three palettes render correctly\n\nCloses #59\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\nEOF\n\\)\")",
+      "Bash(cd \"C:\\\\Users\\\\smile\\\\projects\\\\wy-theme\\\\.claude\\\\worktrees\\\\agent-a9d39c4d\" && gh pr create --title \"Add visual selection summary in sidebar \\(#55\\)\" --body \"$\\(cat <<'EOF'\n## Summary\n- Add SELECTION SUMMARY section to sidebar when visual marks are active\n- Shows FILES count, DIRS count, and TOTAL aggregate size\n- Summary disappears when all marks are cleared\n\n## Test plan\n- [ ] Enter visual mode \\(V\\), select multiple files/dirs\n- [ ] Verify SELECTION SUMMARY appears with accurate counts\n- [ ] Clear marks, verify summary disappears\n\nCloses #55\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\nEOF\n\\)\")",
+      "Bash(cd \"C:\\\\Users\\\\smile\\\\projects\\\\wy-theme\" && gh pr merge 60 --merge --delete-branch 2>&1)"
+    ]
+  },
+  "outputStyle": "default"
+}
