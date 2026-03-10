@@ -46,6 +46,43 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
                     Style::default().fg(pal.text_hot).bg(pal.bg),
                 ),
             ]));
+
+            // Size sparkline (#59)
+            let pane = app.pane();
+            let sibling_sizes: Vec<u64> = pane.entries.iter()
+                .filter_map(|e| e.size)
+                .collect();
+            if sibling_sizes.len() > 1 {
+                let max_size = sibling_sizes.iter().copied().max().unwrap_or(1).max(1);
+                let bar_width = (width).saturating_sub(8);
+                let blocks = ["\u{2581}", "\u{2582}", "\u{2583}", "\u{2584}", "\u{2585}", "\u{2586}", "\u{2587}", "\u{2588}"];
+                let bucket_count = bar_width.min(sibling_sizes.len());
+                let mut sorted = sibling_sizes.clone();
+                sorted.sort();
+                let bucket_size = (sorted.len() + bucket_count - 1) / bucket_count;
+                let mut spark = String::new();
+                for i in 0..bucket_count {
+                    let start = i * bucket_size;
+                    let end = ((i + 1) * bucket_size).min(sorted.len());
+                    if start >= sorted.len() { break; }
+                    let avg = sorted[start..end].iter().sum::<u64>() / (end - start) as u64;
+                    let level = ((avg as f64 / max_size as f64) * 7.0) as usize;
+                    spark.push_str(blocks[level.min(7)]);
+                }
+                let rank = sorted.iter().filter(|&&s| s <= size).count();
+                let pct = if !sorted.is_empty() { rank * 100 / sorted.len() } else { 0 };
+                lines.push(Line::from(vec![
+                    Span::styled(" RANK  ", Style::default().fg(pal.text_dim).bg(pal.bg)),
+                    Span::styled(
+                        format!("P{}", pct),
+                        Style::default().fg(pal.text_hot).bg(pal.bg),
+                    ),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled(" ", Style::default().bg(pal.bg)),
+                    Span::styled(spark, Style::default().fg(pal.text_mid).bg(pal.bg)),
+                ]));
+            }
         }
 
         if let Some(modified) = entry.modified {
