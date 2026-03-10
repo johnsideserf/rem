@@ -1358,7 +1358,60 @@ fn handle_command(app: &mut App, key: KeyEvent) {
 }
 
 fn execute_command(app: &mut App, cmd: &str) {
-    let parts: Vec<&str> = cmd.trim().splitn(2, ' ').collect();
+    let trimmed = cmd.trim();
+
+    // Shell command: !<command>
+    if let Some(shell_cmd) = trimmed.strip_prefix('!') {
+        let shell_cmd = shell_cmd.trim();
+        if shell_cmd.is_empty() {
+            app.error = Some(("SHELL COMMAND REQUIRED AFTER !".to_string(), Instant::now()));
+            return;
+        }
+        app.shell_output = None;
+        let output = if cfg!(windows) {
+            std::process::Command::new("cmd")
+                .args(["/C", shell_cmd])
+                .current_dir(&app.pane().current_dir)
+                .output()
+        } else {
+            std::process::Command::new("sh")
+                .args(["-c", shell_cmd])
+                .current_dir(&app.pane().current_dir)
+                .output()
+        };
+        match output {
+            Ok(out) => {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                let combined = if stderr.is_empty() {
+                    stdout.to_string()
+                } else if stdout.is_empty() {
+                    stderr.to_string()
+                } else {
+                    format!("{}\n{}", stdout, stderr)
+                };
+                let truncated = if combined.len() > 200 {
+                    format!("{}…", &combined[..200])
+                } else {
+                    combined
+                };
+                let msg = truncated.lines().next().unwrap_or("").to_string();
+                app.error = Some((
+                    if msg.is_empty() { "COMMAND EXECUTED".to_string() } else { msg },
+                    Instant::now(),
+                ));
+                app.shell_output = Some(truncated);
+                app.ops_log.push("SHELL", shell_cmd);
+            }
+            Err(e) => {
+                app.error = Some((format!("SHELL FAILURE: {}", e), Instant::now()));
+            }
+        }
+        app.load_entries();
+        return;
+    }
+
+    let parts: Vec<&str> = trimmed.splitn(2, ' ').collect();
     match parts.first().copied() {
         Some("q") | Some("quit") => {
             app.should_quit = true;
@@ -1423,8 +1476,11 @@ fn execute_command(app: &mut App, cmd: &str) {
                 crate::config::save_symbols(variant);
             }
         }
+        Some("shell") => {
+            app.error = Some(("USE :!<command> TO EXECUTE SHELL COMMANDS".to_string(), Instant::now()));
+        }
         Some("help") => {
-            app.error = Some(("COMMANDS: q cd set sort theme symbols help".to_string(), Instant::now()));
+            app.error = Some(("COMMANDS: q cd set sort theme symbols shell help".to_string(), Instant::now()));
         }
         _ => {
             app.error = Some(("UNKNOWN COMMAND \u{2014} TYPE :help".to_string(), Instant::now()));
