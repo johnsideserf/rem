@@ -8,47 +8,80 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
 use ratatui::Terminal;
+use sysinfo::System;
 
 use crate::logo;
 use crate::palette::Palette;
 use crate::throbber::{PaletteVariant, Throbber, ThrobberKind};
 
-struct BootLine {
-    label: &'static str,
-    dots: &'static str,
-    value: &'static str,
+/// A resolved boot line with owned strings (so we can inject live values).
+struct ResolvedBootLine {
+    label: String,
+    dots: String,
+    value: String,
+    /// If true, this line gets the disk-throbber treatment during boot.
+    is_disk: bool,
 }
 
-/// Ship terminal (Nostromo, Sulaco) — shipboard system init
-const BOOT_GREEN: &[BootLine] = &[
-    BootLine { label: "BIOS",      dots: " .............. ", value: "OK" },
-    BootLine { label: "MEMORY",    dots: " ............ ", value: "640K" },
-    BootLine { label: "DISK",      dots: " .............. ", value: "" },
-    BootLine { label: "NAV SYS",   dots: " ........... ", value: "ONLINE" },
-];
+/// Build the boot line sequence for a given palette variant, with live system values.
+fn build_boot_lines(variant: PaletteVariant) -> Vec<ResolvedBootLine> {
+    let mut sys = System::new();
+    sys.refresh_memory();
+    sys.refresh_cpu_all();
 
-/// Colony terminal (Hadley's Hope) — frontier ops init
-const BOOT_AMBER: &[BootLine] = &[
-    BootLine { label: "BIOS",      dots: " .............. ", value: "OK" },
-    BootLine { label: "MEMORY",    dots: " ............ ", value: "512K" },
-    BootLine { label: "DISK",      dots: " .............. ", value: "" },
-    BootLine { label: "ATMO PROC", dots: " .......... ", value: "NOMINAL" },
-];
+    let total_ram_mb = sys.total_memory() / (1024 * 1024);
+    let cpu_count = sys.cpus().len();
 
-/// Corporate terminal (Weyland-Yutani) — executive access init
-const BOOT_CYAN: &[BootLine] = &[
-    BootLine { label: "BIOS",      dots: " .............. ", value: "OK" },
-    BootLine { label: "MEMORY",    dots: " ............ ", value: "2048K" },
-    BootLine { label: "DISK",      dots: " .............. ", value: "" },
-    BootLine { label: "CLEARANCE", dots: " ......... ", value: "GRANTED" },
-];
+    let ram_str = if total_ram_mb >= 1024 {
+        format!("{}GB", total_ram_mb / 1024)
+    } else {
+        format!("{}MB", total_ram_mb)
+    };
 
-fn boot_lines_for(variant: PaletteVariant) -> &'static [BootLine] {
-    match variant {
-        PaletteVariant::Green => BOOT_GREEN,
-        PaletteVariant::Amber => BOOT_AMBER,
-        PaletteVariant::Cyan => BOOT_CYAN,
-    }
+    let cpu_str = if cpu_count > 0 {
+        format!("{} CORES", cpu_count)
+    } else {
+        "OK".to_string()
+    };
+
+    let tail_line: (&str, &str, &str) = match variant {
+        PaletteVariant::Green => ("NAV SYS",   " ........... ", "ONLINE"),
+        PaletteVariant::Amber => ("ATMO PROC", " .......... ", "NOMINAL"),
+        PaletteVariant::Cyan  => ("CLEARANCE", " ......... ", "GRANTED"),
+    };
+
+    vec![
+        ResolvedBootLine {
+            label: "BIOS".into(),
+            dots:  " .............. ".into(),
+            value: "OK".into(),
+            is_disk: false,
+        },
+        ResolvedBootLine {
+            label: "CPU".into(),
+            dots:  " ............... ".into(),
+            value: cpu_str,
+            is_disk: false,
+        },
+        ResolvedBootLine {
+            label: "MEMORY".into(),
+            dots:  " ............ ".into(),
+            value: ram_str,
+            is_disk: false,
+        },
+        ResolvedBootLine {
+            label: "DISK".into(),
+            dots:  " .............. ".into(),
+            value: String::new(),
+            is_disk: true,
+        },
+        ResolvedBootLine {
+            label: tail_line.0.into(),
+            dots:  tail_line.1.into(),
+            value: tail_line.2.into(),
+            is_disk: false,
+        },
+    ]
 }
 
 /// Total logo block lines: logo art (11) + blank + corp name + tagline + rule = 15
@@ -60,7 +93,8 @@ pub fn run_boot(
     palette: Palette,
 ) -> io::Result<bool> {
     let mut throbber = Throbber::new(ThrobberKind::DataStream, palette.variant);
-    let boot_lines = boot_lines_for(palette.variant);
+    let boot_lines = build_boot_lines(palette.variant);
+    let disk_index = boot_lines.iter().position(|bl| bl.is_disk);
     let start = Instant::now();
 
     let mut visible_logo_lines: usize = 0;
@@ -128,7 +162,7 @@ pub fn run_boot(
                 if visible_boot_lines < boot_lines.len() {
                     if !boot_value_shown[visible_boot_lines] {
                         if sub_elapsed >= Duration::from_millis(100) {
-                            if visible_boot_lines == 2 {
+                            if disk_index == Some(visible_boot_lines) {
                                 boot_value_shown[visible_boot_lines] = true;
                                 phase = Phase::DiskThrobber;
                                 phase_timer = Instant::now();
@@ -249,23 +283,23 @@ pub fn run_boot(
                     }
                     lines.push(Line::from(vec![
                         Span::styled(format!("  {}", bl.label), Style::default().fg(palette.text_mid)),
-                        Span::styled(bl.dots, Style::default().fg(palette.text_dim)),
+                        Span::styled(bl.dots.as_str(), Style::default().fg(palette.text_dim)),
                     ]));
                     break;
                 }
 
-                if i == 2 && !disk_resolved {
+                if bl.is_disk && !disk_resolved {
                     lines.push(Line::from(vec![
                         Span::styled(format!("  {}", bl.label), Style::default().fg(palette.text_mid)),
-                        Span::styled(bl.dots, Style::default().fg(palette.text_dim)),
+                        Span::styled(bl.dots.as_str(), Style::default().fg(palette.text_dim)),
                         Span::styled(throbber.frame(), Style::default().fg(palette.text_hot)),
                         Span::styled(" SCANNING", Style::default().fg(palette.text_dim)),
                     ]));
                 } else {
-                    let value = if i == 2 { "OK" } else { bl.value };
+                    let value = if bl.is_disk { "OK" } else { bl.value.as_str() };
                     lines.push(Line::from(vec![
                         Span::styled(format!("  {}", bl.label), Style::default().fg(palette.text_mid)),
-                        Span::styled(bl.dots, Style::default().fg(palette.text_dim)),
+                        Span::styled(bl.dots.as_str(), Style::default().fg(palette.text_dim)),
                         Span::styled(value, Style::default().fg(palette.text_hot)),
                     ]));
                 }
