@@ -63,12 +63,14 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
     // Determine which columns to show
     let show_size = width >= 90;
     let show_type = width >= 80;
+    let show_perms = width >= 110;
 
     let size_col = if show_size { 9 } else { 0 };
     let type_col = if show_type { 5 } else { 0 };
+    let perms_col = if show_perms { 10 } else { 0 };
     let jump_col = 5;
     let sigil_col = 2;
-    let right_cols = size_col + type_col;
+    let right_cols = size_col + type_col + perms_col;
     let name_width = width.saturating_sub(jump_col + sigil_col + right_cols + 2);
 
     let visible_height = area.height as usize;
@@ -169,6 +171,15 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
             icon_style = icon_style.add_modifier(Modifier::ITALIC);
         }
         spans.push(Span::styled(icon_text, icon_style));
+
+        // Permissions column (#47)
+        if show_perms {
+            let perm_str = entry.permissions.as_deref().unwrap_or("---");
+            spans.push(Span::styled(
+                format!("{:<10}", perm_str),
+                Style::default().fg(pal.text_dim).bg(row_bg),
+            ));
+        }
 
         // Name — check for Rename/Create mode inline editing
         let is_rename_row = is_active && is_cursor && app.mode == Mode::Rename;
@@ -590,6 +601,7 @@ pub fn render_rsearch(f: &mut Frame, app: &App, area: Rect) {
             modified: None,
             is_symlink: false,
             link_target: None,
+            permissions: None,
         };
         let icon = icon_for(&fake_entry, &app.symbols);
 
