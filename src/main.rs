@@ -1,6 +1,7 @@
 mod app;
 mod archive;
 mod config;
+mod favorites;
 mod highlight;
 mod input;
 mod logo;
@@ -74,6 +75,9 @@ fn main() -> io::Result<()> {
 
     // Load bookmarks
     app.marks = marks::load_marks();
+
+    // Load favorites (#54)
+    app.favorites = favorites::load_favorites();
 
     // Setup terminal
     terminal::enable_raw_mode()?;

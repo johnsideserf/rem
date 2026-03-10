@@ -226,6 +226,31 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         }
     }
 
+    // FAVORITES section (#54)
+    if !app.favorites.is_empty() {
+        lines.push(Line::from(Span::raw("")));
+        lines.push(Line::from(Span::styled(
+            " F A V O R I T E S",
+            Style::default().fg(pal.text_dim).bg(pal.bg),
+        )));
+        for (i, fav) in app.favorites.iter().take(9).enumerate() {
+            let dir_name = fav.file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| fav.to_string_lossy().into_owned());
+            let max_fav = width.saturating_sub(7);
+            let display = if dir_name.chars().count() > max_fav {
+                let t: String = dir_name.chars().take(max_fav.saturating_sub(1)).collect();
+                format!("{}\u{2026}", t)
+            } else {
+                dir_name
+            };
+            lines.push(Line::from(vec![
+                Span::styled(format!(" {} ", i + 1), Style::default().fg(pal.text_hot).bg(pal.bg)),
+                Span::styled(display, Style::default().fg(pal.text_mid).bg(pal.bg)),
+            ]));
+        }
+    }
+
     // Pad to fill area
     let height = area.height as usize;
     while lines.len() < height {

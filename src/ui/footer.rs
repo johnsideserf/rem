@@ -235,6 +235,7 @@ fn collect_hints(app: &App) -> Vec<(&'static str, &'static str)> {
             h.push(("Y", "yank path"));
             h.push(("^L", "ops log"));
             h.push((":", "command"));
+            h.push(("^F", "fav"));
             h.push(("L", "lock"));
             h.push(("t", "theme"));
             h.push(("q", "quit"));
