@@ -134,6 +134,20 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
                         Style::default().fg(pal.text_mid).bg(pal.bg),
                     )));
                 }
+                PreviewContent::HexDump { lines: hex_lines, size } => {
+                    lines.push(Line::from(Span::styled(
+                        format!(" BINARY {} {}", crate::app::format_size(size), app.symbols.em_dash),
+                        Style::default().fg(pal.text_mid).bg(pal.bg),
+                    )));
+                    lines.push(Line::from(Span::raw("")));
+                    for line in hex_lines.iter().skip(app.preview_scroll).take(height.saturating_sub(3)) {
+                        let truncated = truncate_chars(line, width.saturating_sub(1));
+                        lines.push(Line::from(Span::styled(
+                            format!(" {}", truncated),
+                            Style::default().fg(pal.text_mid).bg(pal.bg),
+                        )));
+                    }
+                }
                 PreviewContent::TooLarge => {
                     lines.push(Line::from(Span::styled(
                         " [FILE > 1MB]",
