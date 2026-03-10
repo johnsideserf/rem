@@ -165,6 +165,19 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         )));
     }
 
+    // Tags (#58)
+    if let Some(entry) = app.current_entry() {
+        if let Some(tags) = app.tags.get(&entry.path) {
+            lines.push(Line::from(vec![
+                Span::styled(" TAGS  ", Style::default().fg(pal.text_dim).bg(pal.bg)),
+                Span::styled(
+                    tags.join(", "),
+                    Style::default().fg(pal.text_hot).bg(pal.bg),
+                ),
+            ]));
+        }
+    }
+
     // SHA-256 hash display (#20)
     if let Some(entry) = app.current_entry() {
         if let Some((hash_path, hash_val)) = &app.last_hash {

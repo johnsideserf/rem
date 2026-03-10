@@ -44,6 +44,7 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         Mode::Edit => ("EDIT", pal.text_mid),
         Mode::OpsLog => ("LOG", pal.text_mid),
         Mode::Command => ("COMMAND", pal.text_mid),
+        Mode::TagInput => ("TAG", pal.text_mid),
     };
 
     // Left side: status info
