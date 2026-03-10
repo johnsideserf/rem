@@ -687,6 +687,8 @@ pub struct App {
     pub layout_areas: LayoutAreas,
     // Command mode (#41)
     pub command_state: CommandState,
+    // Favorites / pinned directories (#54)
+    pub favorites: Vec<PathBuf>,
 }
 
 impl App {
@@ -772,6 +774,7 @@ impl App {
                 history: Vec::new(),
                 history_idx: None,
             },
+            favorites: Vec::new(),
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);

@@ -328,6 +328,29 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
                 build_tree(app);
             }
         }
+        // Favorites toggle (#54)
+        (KeyModifiers::CONTROL, KeyCode::Char('f')) => {
+            let dir = app.pane().current_dir.clone();
+            if let Some(pos) = app.favorites.iter().position(|p| *p == dir) {
+                app.favorites.remove(pos);
+                app.error = Some(("FAVORITE REMOVED".to_string(), Instant::now()));
+            } else {
+                app.favorites.push(dir);
+                app.error = Some(("FAVORITE ADDED".to_string(), Instant::now()));
+            }
+            crate::favorites::save_favorites(&app.favorites);
+        }
+        // Quick jump to favorite (#54)
+        (KeyModifiers::ALT, KeyCode::Char(c)) if c >= '1' && c <= '9' => {
+            let idx = (c as usize) - ('1' as usize);
+            if let Some(dir) = app.favorites.get(idx).cloned() {
+                if dir.is_dir() {
+                    app.navigate_to(dir);
+                } else {
+                    app.error = Some(("FAVORITE PATH NO LONGER EXISTS".to_string(), Instant::now()));
+                }
+            }
+        }
         // Dual-pane diff toggle (#45)
         (KeyModifiers::CONTROL, KeyCode::Char('x')) => {
             if app.dual_pane {
