@@ -71,6 +71,12 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect, show_c
         spans.push(Span::styled("  ", Style::default()));
     }
 
+    // Sort indicator (#56)
+    spans.push(Span::styled(
+        format!(" SORT:{}", app.sort_mode.label()),
+        Style::default().fg(pal.text_dim),
+    ));
+
     // Use pulsed border color for active pane (#18)
     let border_color = if show_cursor { app.pulsed_border() } else { pal.border_dim };
     let block = Block::default()
