@@ -12,6 +12,7 @@ mod palette;
 mod preview;
 mod symbols;
 mod sysmon;
+mod tags;
 mod throbber;
 mod ui;
 
@@ -79,6 +80,9 @@ fn main() -> io::Result<()> {
     // Load favorites (#54)
     app.favorites = favorites::load_favorites();
 
+    // Load tags (#58)
+    app.tags = tags::load_tags();
+
     // Setup terminal
     terminal::enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -107,6 +111,9 @@ fn main() -> io::Result<()> {
 
     // Save bookmarks
     marks::save_marks(&app.marks);
+
+    // Save tags (#58)
+    tags::save_tags(&app.tags);
 
     match result {
         Ok(Some(path)) => {

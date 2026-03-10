@@ -43,6 +43,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         Mode::Edit => handle_edit(app, key),
         Mode::OpsLog => handle_ops_log(app, key),
         Mode::Command => handle_command(app, key),
+        Mode::TagInput => handle_tag_input(app, key),
     }
 }
 
@@ -324,6 +325,13 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
             app.command_state.cursor = 0;
             app.command_state.history_idx = None;
             app.mode = Mode::Command;
+        }
+        // File tagging (#58)
+        (KeyModifiers::CONTROL, KeyCode::Char('t')) => {
+            if app.current_entry().is_some() {
+                app.tag_input.clear();
+                app.mode = Mode::TagInput;
+            }
         }
         // Tree view toggle (#44)
         (KeyModifiers::SHIFT, KeyCode::Char('T')) => {
@@ -1483,12 +1491,68 @@ fn execute_command(app: &mut App, cmd: &str) {
         Some("shell") => {
             app.error = Some(("USE :!<command> TO EXECUTE SHELL COMMANDS".to_string(), Instant::now()));
         }
+        Some("tag") => {
+            if let Some(tag) = parts.get(1).map(|s| s.trim().to_string()) {
+                if !tag.is_empty() {
+                    if let Some(entry) = app.current_entry() {
+                        let path = entry.path.clone();
+                        app.tags.add_tag(path, tag);
+                        crate::tags::save_tags(&app.tags);
+                        app.error = Some(("TAG ADDED".to_string(), Instant::now()));
+                    }
+                }
+            } else {
+                app.error = Some(("USAGE: tag <name>".to_string(), Instant::now()));
+            }
+        }
+        Some("untag") => {
+            if let Some(tag) = parts.get(1).map(|s| s.trim()) {
+                if !tag.is_empty() {
+                    if let Some(entry) = app.current_entry() {
+                        let path = entry.path.clone();
+                        app.tags.remove_tag(&path, tag);
+                        crate::tags::save_tags(&app.tags);
+                        app.error = Some(("TAG REMOVED".to_string(), Instant::now()));
+                    }
+                }
+            } else {
+                app.error = Some(("USAGE: untag <name>".to_string(), Instant::now()));
+            }
+        }
         Some("help") => {
-            app.error = Some(("COMMANDS: q cd set sort theme symbols shell help".to_string(), Instant::now()));
+            app.error = Some(("COMMANDS: q cd set sort theme symbols shell tag untag help".to_string(), Instant::now()));
         }
         _ => {
             app.error = Some(("UNKNOWN COMMAND \u{2014} TYPE :help".to_string(), Instant::now()));
         }
+    }
+}
+
+/// Handle tag input mode (#58).
+fn handle_tag_input(app: &mut App, key: KeyEvent) {
+    match (key.modifiers, key.code) {
+        (_, KeyCode::Esc) => {
+            app.mode = Mode::Normal;
+        }
+        (_, KeyCode::Enter) => {
+            if !app.tag_input.is_empty() {
+                if let Some(entry) = app.current_entry() {
+                    let path = entry.path.clone();
+                    let tag = app.tag_input.clone();
+                    app.tags.add_tag(path, tag);
+                    crate::tags::save_tags(&app.tags);
+                    app.error = Some(("TAG ADDED".to_string(), Instant::now()));
+                }
+            }
+            app.mode = Mode::Normal;
+        }
+        (_, KeyCode::Backspace) => {
+            app.tag_input.pop();
+        }
+        (KeyModifiers::NONE | KeyModifiers::SHIFT, KeyCode::Char(c)) => {
+            app.tag_input.push(c);
+        }
+        _ => {}
     }
 }
 

@@ -14,6 +14,9 @@ pub fn required_height(app: &App, width: u16) -> u16 {
     if matches!(app.mode, Mode::Command) {
         return 1;
     }
+    if matches!(app.mode, Mode::TagInput) {
+        return 1;
+    }
     let mut h = 0u16;
     // Disk warning row (#34)
     if app.disk_warning.is_some() {
@@ -111,6 +114,24 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
             .border_style(Style::default().fg(pal.border_hot))
             .style(Style::default().bg(pal.surface));
         let paragraph = Paragraph::new(cmd_line).block(block);
+        f.render_widget(paragraph, area);
+        return;
+    }
+
+    // Tag input mode (#58)
+    if matches!(app.mode, Mode::TagInput) {
+        let cursor_char = if app.blink_on { app.symbols.text_cursor } else { " " };
+        let tag_line = Line::from(vec![
+            Span::styled(" TAG> ", Style::default().fg(pal.text_hot).bg(pal.surface)),
+            Span::styled(app.tag_input.clone(), Style::default().fg(pal.text_mid).bg(pal.surface)),
+            Span::styled(cursor_char, Style::default().fg(pal.text_hot).bg(pal.surface)),
+        ]);
+        let block = Block::default()
+            .borders(Borders::TOP)
+            .border_type(BorderType::Plain)
+            .border_style(Style::default().fg(pal.border_hot))
+            .style(Style::default().bg(pal.surface));
+        let paragraph = Paragraph::new(tag_line).block(block);
         f.render_widget(paragraph, area);
         return;
     }
@@ -250,6 +271,7 @@ fn collect_hints(app: &App) -> Vec<(&'static str, &'static str)> {
             if !app.undo_stack.is_empty() {
                 h.push(("^Z", "undo"));
             }
+            h.push(("^T", "tag"));
             h.push((":", "command"));
             h.push(("^F", "fav"));
             h.push(("L", "lock"));
@@ -329,6 +351,13 @@ fn collect_hints(app: &App) -> Vec<(&'static str, &'static str)> {
                 ("j/k", "scroll"),
                 ("g/G", "top/bottom"),
                 ("esc", "close"),
+            ]
+        }
+        Mode::TagInput => {
+            vec![
+                ("type", "tag name"),
+                ("enter", "add"),
+                ("esc", "cancel"),
             ]
         }
         Mode::Command => {

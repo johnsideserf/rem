@@ -47,6 +47,7 @@ pub enum Mode {
     Edit,                 // in-app text editor
     OpsLog,               // operations log viewer (#43)
     Command,              // MU-TH-UR command mode (#41)
+    TagInput,             // typing a tag name (#58)
 }
 
 #[derive(PartialEq, Eq, Clone)]
@@ -709,6 +710,9 @@ pub struct App {
     pub shell_output: Option<String>,
     // Undo stack (#53)
     pub undo_stack: Vec<UndoRecord>,
+    // File tagging (#58)
+    pub tags: crate::tags::TagStore,
+    pub tag_input: String,
 }
 
 impl App {
@@ -800,6 +804,8 @@ impl App {
             favorites: Vec::new(),
             shell_output: None,
             undo_stack: Vec::new(),
+            tags: crate::tags::TagStore::new(),
+            tag_input: String::new(),
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);

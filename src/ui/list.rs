@@ -315,6 +315,16 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
             }
         }
 
+        // Tag badges (#58)
+        if let Some(tags) = app.tags.get(&entry.path) {
+            for tag in tags.iter().take(3) {
+                spans.push(Span::styled(
+                    format!(" [{}]", tag.to_uppercase()),
+                    Style::default().fg(pal.border_mid).bg(row_bg),
+                ));
+            }
+        }
+
         // Type badge
         if show_type {
             let badge = file_type_badge(entry);
