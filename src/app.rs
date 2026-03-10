@@ -697,6 +697,8 @@ pub struct App {
     pub command_state: CommandState,
     // Favorites / pinned directories (#54)
     pub favorites: Vec<PathBuf>,
+    // Shell command output (#57)
+    pub shell_output: Option<String>,
 }
 
 impl App {
@@ -786,6 +788,7 @@ impl App {
                 completion_prefix: String::new(),
             },
             favorites: Vec::new(),
+            shell_output: None,
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);
