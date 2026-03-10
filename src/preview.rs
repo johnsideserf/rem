@@ -7,6 +7,7 @@ const MAX_LINES: usize = 500;
 pub enum PreviewContent {
     Text(Vec<String>),
     Binary,
+    HexDump { lines: Vec<String>, size: u64 },
     TooLarge,
     Empty,
     Error(String),
@@ -134,7 +135,25 @@ pub fn load_preview(path: &Path) -> PreviewContent {
     // Check for binary content: NUL bytes in first 8KB
     let check_len = bytes.len().min(8192);
     if bytes[..check_len].contains(&0) {
-        return PreviewContent::Binary;
+        // Generate hex dump of first 256 bytes
+        let hex_bytes = &bytes[..bytes.len().min(256)];
+        let mut hex_lines = Vec::new();
+        for (offset, chunk) in hex_bytes.chunks(16).enumerate() {
+            let addr = format!("{:08X}", offset * 16);
+            let hex_part: String = chunk.iter()
+                .enumerate()
+                .map(|(i, b)| {
+                    if i == 8 { format!("  {:02X}", b) } else { format!(" {:02X}", b) }
+                })
+                .collect();
+            // Pad hex part to fixed width (49 chars: 16 bytes * 3 chars + 1 extra space at pos 8)
+            let hex_padded = format!("{:<49}", hex_part);
+            let ascii: String = chunk.iter()
+                .map(|&b| if b >= 0x20 && b < 0x7F { b as char } else { '.' })
+                .collect();
+            hex_lines.push(format!("{}  {}  |{}|", addr, hex_padded, ascii));
+        }
+        return PreviewContent::HexDump { lines: hex_lines, size: meta.len() };
     }
 
     // Parse as UTF-8 (lossy)
