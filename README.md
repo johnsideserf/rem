@@ -176,6 +176,14 @@ cargo build --release
 
 ---
 
-*Weyland-Yutani Corporation. Building Better Worlds.*
+## Disclaimer
 
-*This software is provided under the MIT license. The Company assumes no liability for data loss, xenomorph encounters, or crew expenditure resulting from use of this terminal.*
+This software is an independent fan creation and is not affiliated with, endorsed by, or associated with 20th Century Studios, the Walt Disney Company, or the creators of the Alien franchise. "Weyland-Yutani," "Nostromo," "Sulaco," "MU-TH-UR," "LV-426," "Building Better Worlds," and all related names, references, and fictional lore are trademarks and copyrighted properties of their respective owners. All franchise references are used purely as creative homage in a transformative, non-commercial fan work.
+
+## License
+
+This project is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
+
+---
+
+*Building Better Worlds.*
