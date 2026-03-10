@@ -12,6 +12,48 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
 
     let mut lines: Vec<Line> = Vec::new();
 
+    // Visual selection summary (#55)
+    if !app.visual_marks.is_empty() {
+        lines.push(Line::from(Span::styled(
+            " S E L E C T I O N   S U M M A R Y",
+            Style::default().fg(pal.text_dim).bg(pal.bg),
+        )));
+        let pane = app.pane();
+        let mut total_size: u64 = 0;
+        let mut file_count: usize = 0;
+        let mut dir_count: usize = 0;
+        for &idx in &app.visual_marks {
+            if let Some(entry) = pane.entries.get(idx) {
+                if entry.is_dir {
+                    dir_count += 1;
+                } else {
+                    file_count += 1;
+                    if let Some(s) = entry.size {
+                        total_size += s;
+                    }
+                }
+            }
+        }
+        lines.push(Line::from(vec![
+            Span::styled(" FILES ", Style::default().fg(pal.text_dim).bg(pal.bg)),
+            Span::styled(file_count.to_string(), Style::default().fg(pal.text_hot).bg(pal.bg)),
+        ]));
+        if dir_count > 0 {
+            lines.push(Line::from(vec![
+                Span::styled(" DIRS  ", Style::default().fg(pal.text_dim).bg(pal.bg)),
+                Span::styled(dir_count.to_string(), Style::default().fg(pal.text_hot).bg(pal.bg)),
+            ]));
+        }
+        lines.push(Line::from(vec![
+            Span::styled(" TOTAL ", Style::default().fg(pal.text_dim).bg(pal.bg)),
+            Span::styled(
+                crate::app::format_size(total_size),
+                Style::default().fg(pal.text_hot).bg(pal.bg),
+            ),
+        ]));
+        lines.push(Line::from(Span::raw("")));
+    }
+
     // SELECTION section
     lines.push(Line::from(Span::styled(
         " S E L E C T I O N",
