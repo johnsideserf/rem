@@ -266,6 +266,11 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
         (KeyModifiers::SHIFT, KeyCode::Char('W')) => {
             app.scan_disk_usage();
         }
+        // Lock screen — activate idle screensaver immediately
+        (KeyModifiers::SHIFT, KeyCode::Char('L')) => {
+            app.idle_active = true;
+            app.idle_locked = true;
+        }
         // Theme picker
         (KeyModifiers::NONE, KeyCode::Char('t')) => {
             app.show_theme_picker = true;

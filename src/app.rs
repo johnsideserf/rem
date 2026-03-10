@@ -565,6 +565,7 @@ pub struct App {
     // Idle screen (#17)
     pub last_input: Instant,
     pub idle_active: bool,
+    pub idle_locked: bool,
     // CRT glitch for cyan (#15)
     pub glitch_tick: u32,
     // SHA-256 hash (#20)
@@ -636,6 +637,7 @@ impl App {
             io_flash_tick: 0,
             last_input: Instant::now(),
             idle_active: false,
+            idle_locked: false,
             glitch_tick: 0,
             last_hash: None,
             hash_op: None,
@@ -741,8 +743,10 @@ impl App {
             self.io_throbber.tick();
             self.io_flash_tick = self.io_flash_tick.saturating_sub(1);
         }
-        // Idle detection (#17)
-        self.idle_active = now.duration_since(self.last_input).as_secs() >= 45;
+        // Idle detection (#17) — don't override manual lock
+        if !self.idle_locked {
+            self.idle_active = now.duration_since(self.last_input).as_secs() >= 45;
+        }
         // CRT glitch (#15)
         self.glitch_tick = self.glitch_tick.wrapping_add(1);
         // Green phosphor trail: track cursor movement, decay ghosts

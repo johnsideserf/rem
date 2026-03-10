@@ -112,8 +112,8 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     spans.push(Span::styled(app.heartbeat.frame(), Style::default().fg(pal.text_hot)));
     spans.push(Span::styled("  ", Style::default()));
 
-    // Signal indicator: cyan shows degraded signal (#15)
-    let signal_label = if app.glitch_enabled && matches!(pal.variant, crate::throbber::PaletteVariant::Cyan) {
+    // Signal indicator: amber colony terminal shows degraded signal
+    let signal_label = if app.glitch_enabled && matches!(pal.variant, crate::throbber::PaletteVariant::Amber) {
         let tick = app.glitch_tick;
         if tick % 37 < 3 {
             "SIGNAL:\u{2591}\u{2591}\u{2591}"

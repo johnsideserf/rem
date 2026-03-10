@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="theme-green">
+<html lang="en" class="theme-amber">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,7 +12,7 @@
     /* ═══════════════════════════════════════════════════════════
        PALETTE SYSTEM — mapped from src/palette.rs
        ═══════════════════════════════════════════════════════════ */
-    :root, .theme-green {
+    .theme-green {
       --bg: rgb(3, 3, 3);
       --surface: rgb(2, 12, 2);
       --text-dim: rgb(0, 82, 24);
@@ -25,7 +25,7 @@
       --glow: rgba(0, 255, 65, 0.12);
       --glow-strong: rgba(0, 255, 65, 0.35);
     }
-    .theme-amber {
+    :root, .theme-amber {
       --bg: rgb(12, 8, 0);
       --surface: rgb(17, 10, 0);
       --text-dim: rgb(90, 58, 0);
@@ -620,13 +620,13 @@
       <div class="section-title">T E R M I N A L &nbsp; C A P A B I L I T I E S</div>
       <ul class="feature-list">
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">NAVIGATION</span><span class="feature-desc">Vim-keyed traversal, jump-to-top/bottom, smooth animated transitions</span></li>
-        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">DUAL-PANE OPS</span><span class="feature-desc">Tab to deploy split-view for cross-directory transfers</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">DUAL-PANE OPS</span><span class="feature-desc">Ctrl+W to toggle split-view, Tab to switch panes</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">VISUAL TARGETING</span><span class="feature-desc">v to enter selection mode, mark multiple assets with j/k</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">ASSET MANAGEMENT</span><span class="feature-desc">yy copy, dd cut, p paste, D purge (requires confirmation)</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">BULK RENAME</span><span class="feature-desc">R in visual mode for find/replace pattern renaming across selections</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">FUZZY SEARCH</span><span class="feature-desc">/ to locate assets in the current directory via pattern matching</span></li>
-        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">RECURSIVE SEARCH</span><span class="feature-desc">S to search across all subdirectories</span></li>
-        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">JUMP KEYS</span><span class="feature-desc">f to display single-key target labels on all visible entries</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">RECURSIVE SEARCH</span><span class="feature-desc">? to search across all subdirectories</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">JUMP KEYS</span><span class="feature-desc">Space to display single-key target labels on all visible entries</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">NAVIGATION MARKS</span><span class="feature-desc">m + key to designate a waypoint, ' + key to return</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">ASSET PREVIEW</span><span class="feature-desc">Side panel with syntax-highlighted, scrollable file contents</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">IN-APP EDITOR</span><span class="feature-desc">e to edit files with syntax highlighting, undo stack, and save</span></li>
@@ -636,6 +636,8 @@
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">SYMBOL SETS</span><span class="feature-desc">7 swappable glyph styles via theme picker</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">SYSTEM TELEMETRY</span><span class="feature-desc">` to monitor CPU, RAM, disk, and network diagnostics</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">DISPLAY PROFILES</span><span class="feature-desc">t to open the theme and symbol set selector</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">FILE INTEGRITY</span><span class="feature-desc"># to compute SHA-256 hash of selected file</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">DISK USAGE</span><span class="feature-desc">W to scan recursive directory size allocation</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">BOOT SEQUENCE</span><span class="feature-desc">Corporate authentication splash with animated WY mark</span></li>
       </ul>
     </section>
@@ -647,9 +649,9 @@
       <div class="section-title">D I S P L A Y &nbsp; P R O F I L E S</div>
 
       <div class="profile-switcher">
-        <button class="profile-btn active" data-theme="green" onclick="setTheme('green')">PHOSPHOR GREEN</button>
-        <button class="profile-btn" data-theme="amber" onclick="setTheme('amber')">AMBER</button>
-        <button class="profile-btn" data-theme="cyan" onclick="setTheme('cyan')">DEGRADED CYAN</button>
+        <button class="profile-btn" data-theme="green" onclick="setTheme('green')">PHOSPHOR GREEN</button>
+        <button class="profile-btn active" data-theme="amber" onclick="setTheme('amber')">AMBER</button>
+        <button class="profile-btn" data-theme="cyan" onclick="setTheme('cyan')">CORPORATE CYAN</button>
       </div>
 
       <div class="profile-cards">
@@ -658,7 +660,7 @@
             <span class="profile-card-name">PHOSPHOR GREEN</span>
             <span class="profile-card-code">WY-CRT-01</span>
           </div>
-          <div class="profile-card-desc">Standard colony terminals</div>
+          <div class="profile-card-desc">Ship terminals (Nostromo, Sulaco)</div>
           <img src="screenshots/green.png" alt="Phosphor Green display profile" loading="lazy">
         </div>
         <div class="profile-card">
@@ -666,16 +668,16 @@
             <span class="profile-card-name">AMBER</span>
             <span class="profile-card-code">WY-CRT-02</span>
           </div>
-          <div class="profile-card-desc">Corporate mainframe consoles</div>
+          <div class="profile-card-desc">Colony terminals (Hadley's Hope)</div>
           <img src="screenshots/amber.png" alt="Amber display profile" loading="lazy">
         </div>
         <div class="profile-card">
           <div class="profile-card-header">
-            <span class="profile-card-name">DEGRADED CYAN</span>
+            <span class="profile-card-name">CORPORATE CYAN</span>
             <span class="profile-card-code">WY-CRT-03</span>
           </div>
-          <div class="profile-card-desc">Field units, survey equipment</div>
-          <img src="screenshots/cyan-w-theme-picker.png" alt="Degraded Cyan display profile with theme picker" loading="lazy">
+          <div class="profile-card-desc">Executive consoles, MedPods</div>
+          <img src="screenshots/cyan-w-theme-picker.png" alt="Corporate Cyan display profile with theme picker" loading="lazy">
         </div>
       </div>
 
@@ -744,18 +746,20 @@
         <tr><td class="cmd-key">k / Up</td><td class="cmd-desc">Cursor up</td></tr>
         <tr><td class="cmd-key">gg</td><td class="cmd-desc">Jump to first entry</td></tr>
         <tr><td class="cmd-key">G</td><td class="cmd-desc">Jump to last entry</td></tr>
-        <tr><td class="cmd-key">H</td><td class="cmd-desc">Navigate back in history</td></tr>
-        <tr><td class="cmd-key">L</td><td class="cmd-desc">Navigate forward in history</td></tr>
+        <tr><td class="cmd-key">Ctrl+O</td><td class="cmd-desc">Navigate back in history</td></tr>
+        <tr><td class="cmd-key">Ctrl+I</td><td class="cmd-desc">Navigate forward in history</td></tr>
+        <tr><td class="cmd-key">Ctrl+U / Ctrl+D</td><td class="cmd-desc">Half-page scroll up / down</td></tr>
         <tr><td class="cmd-key">-</td><td class="cmd-desc">Ascend to parent directory</td></tr>
       </table>
 
       <div class="cmd-group-title">SEARCH &amp; TARGETING</div>
       <table class="cmd-table">
         <tr><td class="cmd-key">/</td><td class="cmd-desc">Fuzzy search current directory</td></tr>
-        <tr><td class="cmd-key">S</td><td class="cmd-desc">Recursive search across subdirectories</td></tr>
-        <tr><td class="cmd-key">f</td><td class="cmd-desc">Deploy jump key overlay</td></tr>
+        <tr><td class="cmd-key">?</td><td class="cmd-desc">Recursive search across subdirectories</td></tr>
+        <tr><td class="cmd-key">Space</td><td class="cmd-desc">Deploy jump key overlay</td></tr>
         <tr><td class="cmd-key">m + key</td><td class="cmd-desc">Set navigation mark</td></tr>
         <tr><td class="cmd-key">' + key</td><td class="cmd-desc">Jump to navigation mark</td></tr>
+        <tr><td class="cmd-key">M + key</td><td class="cmd-desc">Delete navigation mark</td></tr>
       </table>
 
       <div class="cmd-group-title">ASSET OPERATIONS</div>
@@ -766,10 +770,12 @@
         <tr><td class="cmd-key">D</td><td class="cmd-desc">Purge selection (confirmation required)</td></tr>
         <tr><td class="cmd-key">r</td><td class="cmd-desc">Rename asset</td></tr>
         <tr><td class="cmd-key">R</td><td class="cmd-desc">Bulk rename (visual mode -- find/replace)</td></tr>
-        <tr><td class="cmd-key">a</td><td class="cmd-desc">Provision new file</td></tr>
-        <tr><td class="cmd-key">A</td><td class="cmd-desc">Provision new directory</td></tr>
+        <tr><td class="cmd-key">o</td><td class="cmd-desc">Provision new file</td></tr>
+        <tr><td class="cmd-key">O</td><td class="cmd-desc">Provision new directory</td></tr>
         <tr><td class="cmd-key">e</td><td class="cmd-desc">Open in-app text editor</td></tr>
         <tr><td class="cmd-key">E</td><td class="cmd-desc">Open in external $EDITOR</td></tr>
+        <tr><td class="cmd-key">#</td><td class="cmd-desc">Compute SHA-256 hash</td></tr>
+        <tr><td class="cmd-key">W</td><td class="cmd-desc">Scan disk usage recursively</td></tr>
       </table>
 
       <div class="cmd-group-title">SORTING</div>
@@ -785,13 +791,15 @@
 
       <div class="cmd-group-title">DISPLAY &amp; PANELS</div>
       <table class="cmd-table">
-        <tr><td class="cmd-key">Tab</td><td class="cmd-desc">Toggle dual-pane / switch active pane</td></tr>
-        <tr><td class="cmd-key">i</td><td class="cmd-desc">Cycle right panel (info / preview / hidden)</td></tr>
+        <tr><td class="cmd-key">Ctrl+W</td><td class="cmd-desc">Toggle dual-pane mode</td></tr>
+        <tr><td class="cmd-key">Tab</td><td class="cmd-desc">Switch active pane / cycle right panel</td></tr>
+        <tr><td class="cmd-key">Ctrl+J / Ctrl+K</td><td class="cmd-desc">Scroll preview pane down / up</td></tr>
         <tr><td class="cmd-key">[</td><td class="cmd-desc">Contract sidebar</td></tr>
         <tr><td class="cmd-key">]</td><td class="cmd-desc">Expand sidebar</td></tr>
         <tr><td class="cmd-key">t</td><td class="cmd-desc">Open display profile / symbol set selector</td></tr>
         <tr><td class="cmd-key">`</td><td class="cmd-desc">Toggle telemetry readout</td></tr>
-        <tr><td class="cmd-key">.</td><td class="cmd-desc">Toggle hidden assets</td></tr>
+        <tr><td class="cmd-key">H</td><td class="cmd-desc">Toggle hidden assets</td></tr>
+        <tr><td class="cmd-key">L</td><td class="cmd-desc">Lock screen (activate screensaver)</td></tr>
       </table>
 
       <div class="cmd-group-title">GENERAL</div>
@@ -837,7 +845,7 @@
       <div class="cmd-group-title">CLI FLAGS</div>
       <div class="code-block"><span class="prompt">$ </span><span class="cmd">rem</span>              <span class="comment"># default phosphor green profile</span>
 <span class="prompt">$ </span><span class="cmd">rem --amber</span>      <span class="comment"># amber profile</span>
-<span class="prompt">$ </span><span class="cmd">rem --cyan</span>       <span class="comment"># degraded cyan profile</span>
+<span class="prompt">$ </span><span class="cmd">rem --cyan</span>       <span class="comment"># corporate cyan profile</span>
 <span class="prompt">$ </span><span class="cmd">rem --no-boot</span>    <span class="comment"># skip boot sequence</span></div>
     </section>
 

@@ -41,7 +41,7 @@ This document defines the visual language, layout system, color palette, typogra
 Three palette variants. Each represents a different "unit type" from the aesthetic world. The implementation should default to one (recommend Phosphor Green) and allow switching via config.
 
 ### 3.1 Palette A — Phosphor Green (Default)
-*The mainframe. Institutional. Cold. The computer that knows things it won't tell you.*
+*The ship terminal. Nostromo, Sulaco, Covenant. The computer that knows things it won't tell you.*
 
 ```
 BACKGROUND        #030303   — near black, not pure
@@ -70,8 +70,8 @@ const BORDER_HOT:   Color = Color::Rgb(0, 122, 34);
 const WARN:         Color = Color::Rgb(255, 68, 68);
 ```
 
-### 3.2 Palette B — Amber Corporate
-*The executive terminal. Weyland-Yutani ops. Every access is logged.*
+### 3.2 Palette B — Amber Colony
+*The colony terminal. Hadley's Hope, frontier ops. Dropped one too many times. Still works. Barely.*
 
 ```rust
 const BG:           Color = Color::Rgb(12, 8, 0);
@@ -85,8 +85,8 @@ const BORDER_HOT:   Color = Color::Rgb(128, 88, 0);
 const WARN:         Color = Color::Rgb(255, 68, 68);
 ```
 
-### 3.3 Palette C — Degraded Cyan
-*The field unit. Dropped one too many times. Still works. Barely.*
+### 3.3 Palette C — Corporate Cyan
+*The executive terminal. Weyland-Yutani ops. Clean. Clinical. Every access is logged.*
 
 ```rust
 const BG:           Color = Color::Rgb(1, 10, 13);

@@ -137,12 +137,12 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
         render_idle_overlay(f, app, area);
     }
 
-    // CRT glitch effects for cyan palette (#15)
+    // CRT effects per palette
     if app.glitch_enabled {
         match app.palette.variant {
-            crate::throbber::PaletteVariant::Cyan => render_cyan_glitch(f, app, area),
             crate::throbber::PaletteVariant::Green => render_green_effects(f, app, area),
-            crate::throbber::PaletteVariant::Amber => render_amber_effects(f, app, area),
+            crate::throbber::PaletteVariant::Amber => render_colony_glitch(f, app, area),
+            crate::throbber::PaletteVariant::Cyan => render_corporate_effects(f, app, area),
         }
     }
 }
@@ -254,12 +254,12 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
         render_idle_overlay(f, app, area);
     }
 
-    // CRT glitch effects for cyan palette (#15)
+    // CRT effects per palette
     if app.glitch_enabled {
         match app.palette.variant {
-            crate::throbber::PaletteVariant::Cyan => render_cyan_glitch(f, app, area),
             crate::throbber::PaletteVariant::Green => render_green_effects(f, app, area),
-            crate::throbber::PaletteVariant::Amber => render_amber_effects(f, app, area),
+            crate::throbber::PaletteVariant::Amber => render_colony_glitch(f, app, area),
+            crate::throbber::PaletteVariant::Cyan => render_corporate_effects(f, app, area),
         }
     }
 }
@@ -358,12 +358,12 @@ fn render_idle_overlay(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     // Center the logo
     let logo_h = logo.len() as u16;
     let logo_w = logo.first().map(|l| l.len()).unwrap_or(0) as u16;
-    if area.width < logo_w + 4 || area.height < logo_h + 6 {
+    if area.width < logo_w + 4 || area.height < logo_h + 22 {
         return;
     }
 
     let x = area.x + (area.width.saturating_sub(logo_w)) / 2;
-    let y = area.y + (area.height.saturating_sub(logo_h + 4)) / 2;
+    let y = area.y + (area.height.saturating_sub(logo_h + 20)) / 2;
 
     // Dim the entire background
     let dim_area = area;
@@ -387,24 +387,65 @@ fn render_idle_overlay(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     };
     let dot_color = pal.border_dim;
 
+    // Title above logo
+    let title = "W E Y L A N D - Y U T A N I   C O R P O R A T I O N";
+    let title_w = title.len() as u16;
+    let title_x = area.x + (area.width.saturating_sub(title_w)) / 2;
+    let title_y = y;
+    if title_y < area.y + area.height {
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                title,
+                Style::default().fg(pal.text_dim).bg(pal.bg),
+            ))),
+            ratatui::layout::Rect::new(title_x, title_y, title_w, 1),
+        );
+    }
+
+    let logo_y = y + 2;
     for (row, line_str) in logo.iter().enumerate() {
         let mut spans: Vec<Span> = Vec::new();
         for ch in line_str.chars() {
-            let (c, color) = if ch == '@' {
-                ('\u{2588}', burn_color) // solid block
-            } else {
-                ('\u{00b7}', dot_color) // dot for gaps
-            };
+            let color = if ch == '@' { burn_color } else { dot_color };
             spans.push(Span::styled(
-                c.to_string(),
+                ch.to_string(),
                 Style::default().fg(color).bg(pal.bg),
             ));
         }
-        let logo_rect = ratatui::layout::Rect::new(x, y + row as u16, logo_w, 1);
+        let logo_rect = ratatui::layout::Rect::new(x, logo_y + row as u16, logo_w, 1);
         f.render_widget(Paragraph::new(Line::from(spans)), logo_rect);
     }
 
-    // AWAITING INPUT message below logo
+    // Tagline below logo
+    let tagline = "B U I L D I N G   B E T T E R   W O R L D S";
+    let tag_w = tagline.len() as u16;
+    let tag_x = area.x + (area.width.saturating_sub(tag_w)) / 2;
+    let tag_y = logo_y + logo_h + 1;
+    if tag_y < area.y + area.height {
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                tagline,
+                Style::default().fg(pal.text_dim).bg(pal.bg),
+            ))),
+            ratatui::layout::Rect::new(tag_x, tag_y, tag_w, 1),
+        );
+    }
+
+    // Animated braille art per palette
+    let art_h: u16 = 12;
+    let art_w: u16 = 60;
+    let art_y = tag_y + 2;
+    let art_x = area.x + (area.width.saturating_sub(art_w)) / 2;
+    if art_y + art_h < area.y + area.height {
+        let art_rect = ratatui::layout::Rect::new(art_x, art_y, art_w, art_h);
+        match pal.variant {
+            crate::throbber::PaletteVariant::Green => render_idle_orbits(f, app, art_rect),
+            crate::throbber::PaletteVariant::Amber => render_idle_tracker(f, app, art_rect),
+            crate::throbber::PaletteVariant::Cyan => render_idle_helix(f, app, art_rect),
+        }
+    }
+
+    // AWAITING INPUT message
     let msg = "AWAITING INPUT...";
     let throbber = app.heartbeat.frame();
     let msg_line = Line::from(vec![
@@ -415,7 +456,7 @@ fn render_idle_overlay(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     ]);
     let msg_w = (msg.len() + 3) as u16;
     let msg_x = area.x + (area.width.saturating_sub(msg_w)) / 2;
-    let msg_y = y + logo_h + 2;
+    let msg_y = art_y + art_h + 1;
     if msg_y < area.y + area.height {
         f.render_widget(
             Paragraph::new(msg_line),
@@ -424,8 +465,243 @@ fn render_idle_overlay(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     }
 }
 
-/// Render CRT signal degradation effects for cyan palette (#15).
-fn render_cyan_glitch(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+/// Ship terminal idle: horizontal star system chart — planets along an ecliptic with orbiting moons.
+fn render_idle_orbits(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+    use ratatui::widgets::canvas::{Canvas, Line as CanvasLine, Points};
+
+    let pal = app.palette;
+    let tick = app.glitch_tick;
+    let phase = tick as f64 * 0.03;
+
+    let w = area.width as f64 * 2.0;
+    let h = 48.0;
+    let cy = h / 2.0; // ecliptic line
+
+    let hot_color = pal.text_hot;
+    let mid_color = pal.text_mid;
+    let dim_color = pal.border_dim;
+    let ring_color = pal.border_mid;
+    let bg = pal.bg;
+
+    // Bodies along the ecliptic: (x_frac, radius, num_moons, moon_radii[], moon_speeds[])
+    struct Body {
+        x_frac: f64,
+        size: f64,       // dot cluster size
+        moons: &'static [(f64, f64, f64)], // (orbit_radius, speed, phase_offset)
+    }
+
+    const BODIES: &[Body] = &[
+        Body { x_frac: 0.12, size: 1.0, moons: &[(5.0, 1.8, 0.0)] },                           // small inner
+        Body { x_frac: 0.30, size: 2.0, moons: &[(7.0, 1.0, 1.0), (11.0, 0.6, 3.5)] },         // medium
+        Body { x_frac: 0.52, size: 3.0, moons: &[(8.0, 0.9, 0.5), (13.0, 0.5, 2.0), (17.0, 0.3, 4.5)] }, // gas giant
+        Body { x_frac: 0.74, size: 1.5, moons: &[(6.0, 1.2, 1.8)] },                            // outer
+        Body { x_frac: 0.90, size: 1.0, moons: &[] },                                            // distant rock
+    ];
+
+    let canvas = Canvas::default()
+        .block(Block::default().style(Style::default().bg(bg)))
+        .background_color(bg)
+        .x_bounds([0.0, w])
+        .y_bounds([0.0, h])
+        .marker(ratatui::symbols::Marker::Braille)
+        .paint(move |ctx| {
+            // Ecliptic line
+            ctx.draw(&CanvasLine {
+                x1: 4.0, y1: cy, x2: w - 4.0, y2: cy,
+                color: dim_color,
+            });
+
+            for body in BODIES {
+                let bx = w * body.x_frac;
+
+                // Planet body — larger bodies get more dots
+                let mut planet_pts = vec![(bx, cy)];
+                if body.size >= 1.5 {
+                    planet_pts.extend_from_slice(&[(bx + 1.0, cy), (bx - 1.0, cy)]);
+                }
+                if body.size >= 2.5 {
+                    planet_pts.extend_from_slice(&[(bx, cy + 1.0), (bx, cy - 1.0),
+                        (bx + 1.0, cy + 1.0), (bx - 1.0, cy - 1.0)]);
+                }
+                ctx.draw(&Points { coords: &planet_pts, color: hot_color });
+
+                // Orbit rings and moons
+                for &(orbit_r, speed, offset) in body.moons {
+                    // Orbit circle (squashed vertically)
+                    let steps = 48;
+                    let mut ring_pts: Vec<(f64, f64)> = Vec::with_capacity(steps);
+                    for i in 0..steps {
+                        let a = 2.0 * std::f64::consts::PI * i as f64 / steps as f64;
+                        ring_pts.push((bx + orbit_r * a.cos(), cy + orbit_r * a.sin() * 0.6));
+                    }
+                    ctx.draw(&Points { coords: &ring_pts, color: ring_color });
+
+                    // Moon
+                    let angle = phase * speed + offset;
+                    let mx = bx + orbit_r * angle.cos();
+                    let my = cy + orbit_r * angle.sin() * 0.6;
+                    ctx.draw(&Points {
+                        coords: &[(mx, my), (mx + 0.5, my)],
+                        color: mid_color,
+                    });
+                }
+            }
+        });
+
+    f.render_widget(canvas, area);
+}
+
+/// Colony terminal idle: motion tracker sweep with radar blips.
+fn render_idle_tracker(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+    use ratatui::widgets::canvas::{Canvas, Circle, Line as CanvasLine, Points};
+
+    let pal = app.palette;
+    let tick = app.glitch_tick;
+    let sweep_angle = tick as f64 * 0.05; // sweep rotation speed
+
+    let cx = area.width as f64;  // center in canvas coords
+    let cy = 24.0;
+    let max_r = 22.0;
+
+    let hot_color = pal.text_hot;
+    let mid_color = pal.text_mid;
+    let dim_color = pal.border_mid;
+    let bg = pal.bg;
+
+    // Fixed blip positions (angle, radius) — simulate contacts
+    let blips: &[(f64, f64)] = &[
+        (0.8,  14.0),
+        (2.4,  18.0),
+        (3.9,  9.0),
+        (5.1,  20.0),
+        (1.6,  6.0),
+    ];
+
+    let canvas = Canvas::default()
+        .block(Block::default().style(Style::default().bg(bg)))
+        .background_color(bg)
+        .x_bounds([0.0, area.width as f64 * 2.0])
+        .y_bounds([0.0, 48.0])
+        .marker(ratatui::symbols::Marker::Braille)
+        .paint(move |ctx| {
+            // Concentric range rings
+            for i in 1..=3 {
+                let r = max_r * i as f64 / 3.0;
+                ctx.draw(&Circle {
+                    x: cx, y: cy, radius: r,
+                    color: dim_color,
+                });
+            }
+
+            // Cross-hairs
+            ctx.draw(&CanvasLine {
+                x1: cx - max_r, y1: cy, x2: cx + max_r, y2: cy,
+                color: dim_color,
+            });
+            ctx.draw(&CanvasLine {
+                x1: cx, y1: cy - max_r * 0.7, x2: cx, y2: cy + max_r * 0.7,
+                color: dim_color,
+            });
+
+            // Sweep line
+            let sx = cx + max_r * sweep_angle.cos();
+            let sy = cy + max_r * sweep_angle.sin() * 0.7;
+            ctx.draw(&CanvasLine {
+                x1: cx, y1: cy, x2: sx, y2: sy,
+                color: mid_color,
+            });
+
+            // Sweep trail (fading arc behind the sweep line)
+            for i in 1..30 {
+                let trail_angle = sweep_angle - i as f64 * 0.04;
+                let fade = 1.0 - (i as f64 / 30.0);
+                let tr = max_r * (0.3 + 0.7 * fade);
+                let tx = cx + tr * trail_angle.cos();
+                let ty = cy + tr * trail_angle.sin() * 0.7;
+                ctx.draw(&Points {
+                    coords: &[(tx, ty)],
+                    color: dim_color,
+                });
+            }
+
+            // Blips — only visible when sweep line has recently passed
+            for &(blip_angle, blip_r) in blips {
+                let angle_diff = (sweep_angle - blip_angle) % (2.0 * std::f64::consts::PI);
+                let angle_diff = if angle_diff < 0.0 { angle_diff + 2.0 * std::f64::consts::PI } else { angle_diff };
+                // Blip visible for ~1.5 radians after sweep passes
+                if angle_diff < 1.5 {
+                    let bx = cx + blip_r * blip_angle.cos();
+                    let by = cy + blip_r * blip_angle.sin() * 0.7;
+                    let color = if angle_diff < 0.5 { hot_color } else { mid_color };
+                    ctx.draw(&Points {
+                        coords: &[(bx, by), (bx + 1.0, by), (bx, by + 1.0)],
+                        color,
+                    });
+                }
+            }
+        });
+
+    f.render_widget(canvas, area);
+}
+
+/// Corporate terminal idle: rotating double helix — DNA / bioengineering.
+fn render_idle_helix(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+    use ratatui::widgets::canvas::{Canvas, Line as CanvasLine, Points};
+
+    let pal = app.palette;
+    let tick = app.glitch_tick;
+    let phase = tick as f64 * 0.06;
+
+    let x_max = area.width as f64 * 2.0;
+
+    let hot_color = pal.text_mid;
+    let dim_color = pal.border_mid;
+    let bg = pal.bg;
+
+    let canvas = Canvas::default()
+        .block(Block::default().style(Style::default().bg(bg)))
+        .background_color(bg)
+        .x_bounds([0.0, x_max])
+        .y_bounds([-1.3, 1.3])
+        .marker(ratatui::symbols::Marker::Braille)
+        .paint(move |ctx| {
+            let steps = (area.width as usize) * 4;
+            let x_step = x_max / steps as f64;
+
+            let mut pts_a: Vec<(f64, f64)> = Vec::with_capacity(steps);
+            let mut pts_b: Vec<(f64, f64)> = Vec::with_capacity(steps);
+
+            for i in 0..steps {
+                let x = i as f64 * x_step;
+                let t = x * 0.08 + phase;
+                pts_a.push((x, t.sin()));
+                pts_b.push((x, (t + std::f64::consts::PI).sin()));
+            }
+
+            ctx.draw(&Points { coords: &pts_a, color: hot_color });
+            ctx.draw(&Points { coords: &pts_b, color: hot_color });
+
+            // Cross-link rungs
+            let rung_spacing = x_max / 10.0;
+            for i in 0..10 {
+                let x = rung_spacing * (i as f64 + 0.5);
+                let t = x * 0.08 + phase;
+                let ya = t.sin();
+                let yb = (t + std::f64::consts::PI).sin();
+                if (ya - yb).abs() > 0.3 {
+                    ctx.draw(&CanvasLine {
+                        x1: x, y1: ya, x2: x, y2: yb,
+                        color: dim_color,
+                    });
+                }
+            }
+        });
+
+    f.render_widget(canvas, area);
+}
+
+/// Colony terminal signal degradation: character corruption + glitch lines.
+fn render_colony_glitch(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     use ratatui::text::{Line, Span};
     use ratatui::widgets::Paragraph;
 
@@ -567,8 +843,8 @@ fn render_green_effects(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     }
 }
 
-/// Amber CRT effects: rare thermal flicker.
-fn render_amber_effects(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+/// Corporate terminal effects: rare thermal flicker, clean and precise.
+fn render_corporate_effects(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     use ratatui::text::{Line, Span};
     use ratatui::widgets::Paragraph;
 

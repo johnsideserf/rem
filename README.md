@@ -1,5 +1,7 @@
 # rem
 
+[![Docs](https://img.shields.io/badge/docs-johnsideserf.github.io%2Frem-FFB000?style=flat&logo=github)](https://johnsideserf.github.io/rem/)
+
 > **REMOTE ENTRY MODULE** -- Weyland-Yutani Corp. Standard-Issue File Navigation Terminal
 >
 > *Classified under WY-DOC-4789. Unauthorized access is a violation of ICC corporate law.*
@@ -26,47 +28,49 @@ A corporate-grade terminal file navigator built in Rust with [ratatui](https://r
 
 ![Boot sequence](screenshots/boot-amber.gif)
 
-### Phosphor Green -- Standard Issue
+### Phosphor Green -- Ship Terminal
 ![Phosphor Green theme](screenshots/green.png)
 
-### Amber -- Corporate Mainframe
+### Amber -- Colony Terminal
 ![Amber theme](screenshots/amber.png)
 
-### Degraded Cyan -- Field Unit (with theme picker)
-![Degraded Cyan theme with theme picker](screenshots/cyan-w-theme-picker.png)
+### Corporate Cyan -- Executive Terminal (with theme picker)
+![Corporate Cyan theme with theme picker](screenshots/cyan-w-theme-picker.png)
 
 ## Operator Manual
 
 ### Terminal Capabilities
 
 - **Navigation** -- vim-keyed traversal (`hjkl`), jump-to-top/bottom (`gg`/`G`), smooth animated transitions
-- **Dual-pane operations** -- `Tab` to deploy split-view for cross-directory transfers
+- **Dual-pane operations** -- `Ctrl+W` to toggle split-view, `Tab` to switch panes
 - **Visual targeting** -- `v` to enter selection mode, mark multiple assets with `j`/`k`
 - **Asset management** -- `yy` copy, `dd` cut, `p` paste, `D` purge (requires confirmation)
 - **Bulk rename** -- `R` in visual mode for find/replace pattern renaming across selections
 - **Fuzzy search** -- `/` to locate assets in the current directory via pattern matching
-- **Recursive search** -- `S` to search across all subdirectories
-- **Jump keys** -- `f` to display single-key target labels on all visible entries
+- **Recursive search** -- `?` to search across all subdirectories
+- **Jump keys** -- `Space` to display single-key target labels on all visible entries
 - **Navigation marks** -- `m` + key to designate a waypoint, `'` + key to return
 - **Asset preview** -- side panel with syntax-highlighted, scrollable file contents
 - **In-app editor** -- `e` to edit files with syntax highlighting, undo stack, and save
-- **Rename & provision** -- `r` to rename, `a` to create file, `A` to create directory
+- **Rename & provision** -- `r` to rename, `o` to create file, `O` to create directory
 - **Sort modes** -- `s` to cycle between name, size, and date ordering
 - **Git integration** -- current branch and dirty status displayed in header
 - **Nerd Font icons** -- extension-based file icons with fallback for standard terminals
 - **Symbol sets** -- 7 swappable glyph styles via theme picker (Standard, ASCII, Block, Minimal, Pipeline, Braille, Scanline)
 - **System telemetry** -- `` ` `` to monitor CPU, RAM, disk, and network diagnostics
 - **Display profiles** -- `t` to open the theme and symbol set selector
-- **Viewport adjustment** -- `[` / `]` to resize the preview panel
+- **Sidebar adjustment** -- `[` / `]` to resize the sidebar panel
+- **File integrity** -- `#` to compute SHA-256 hash of selected file
+- **Disk usage** -- `W` to scan recursive directory size allocation
 - **Boot sequence** -- corporate authentication splash with animated WY mark
 
 ### Display Profiles
 
 | Profile | Designation | Deployment |
 |---------|-------------|------------|
-| **PHOSPHOR GREEN** | WY-CRT-01 | Standard colony terminals |
-| **AMBER** | WY-CRT-02 | Corporate mainframe consoles |
-| **DEGRADED CYAN** | WY-CRT-03 | Field units, survey equipment |
+| **PHOSPHOR GREEN** | WY-CRT-01 | Ship terminals (Nostromo, Sulaco) |
+| **AMBER** | WY-CRT-02 | Colony terminals (Hadley's Hope) |
+| **CORPORATE CYAN** | WY-CRT-03 | Executive consoles, MedPods |
 
 ### Command Reference
 
@@ -79,18 +83,20 @@ A corporate-grade terminal file navigator built in Rust with [ratatui](https://r
 | `k` / `Up` | Cursor up |
 | `gg` | Jump to first entry |
 | `G` | Jump to last entry |
-| `H` | Navigate back in history |
-| `L` | Navigate forward in history |
+| `Ctrl+O` | Navigate back in history |
+| `Ctrl+I` | Navigate forward in history |
+| `Ctrl+U` / `Ctrl+D` | Half-page scroll up / down |
 | `-` | Ascend to parent directory |
 
 #### Search & Targeting
 | Input | Function |
 |-------|----------|
 | `/` | Fuzzy search current directory |
-| `S` | Recursive search across subdirectories |
-| `f` | Deploy jump key overlay |
+| `?` | Recursive search across subdirectories |
+| `Space` | Deploy jump key overlay |
 | `m` + key | Set navigation mark |
 | `'` + key | Jump to navigation mark |
+| `M` + key | Delete navigation mark |
 
 #### Asset Operations
 | Input | Function |
@@ -101,10 +107,12 @@ A corporate-grade terminal file navigator built in Rust with [ratatui](https://r
 | `D` | Purge selection (confirmation required) |
 | `r` | Rename asset |
 | `R` | Bulk rename (visual mode -- find/replace) |
-| `a` | Provision new file |
-| `A` | Provision new directory |
+| `o` | Provision new file |
+| `O` | Provision new directory |
 | `e` | Open in-app text editor |
 | `E` | Open in external `$EDITOR` |
+| `#` | Compute SHA-256 hash |
+| `W` | Scan disk usage recursively |
 
 #### Sorting
 | Input | Function |
@@ -120,13 +128,15 @@ A corporate-grade terminal file navigator built in Rust with [ratatui](https://r
 #### Display & Panels
 | Input | Function |
 |-------|----------|
-| `Tab` | Toggle dual-pane / switch active pane |
-| `i` | Cycle right panel (info / preview / hidden) |
+| `Ctrl+W` | Toggle dual-pane mode |
+| `Tab` | Switch active pane / cycle right panel |
+| `Ctrl+J` / `Ctrl+K` | Scroll preview pane down / up |
 | `[` | Contract sidebar |
 | `]` | Expand sidebar |
 | `t` | Open display profile / symbol set selector |
 | `` ` `` | Toggle telemetry readout |
-| `.` | Toggle hidden assets |
+| `H` | Toggle hidden assets |
+| `L` | Lock screen (activate screensaver) |
 
 #### General
 | Input | Function |

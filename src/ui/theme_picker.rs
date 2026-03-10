@@ -9,9 +9,9 @@ use crate::palette::Palette;
 use crate::symbols::SymbolVariant;
 
 const THEMES: &[(&str, &str)] = &[
-    ("PHOSPHOR GREEN", "Classic CRT terminal"),
-    ("AMBER",          "Corporate mainframe"),
-    ("DEGRADED CYAN",  "Field unit signal"),
+    ("PHOSPHOR GREEN", "Ship terminal"),
+    ("AMBER",          "Colony terminal"),
+    ("CORPORATE CYAN", "Executive terminal"),
 ];
 
 pub fn render(f: &mut Frame, app: &App, area: Rect) {

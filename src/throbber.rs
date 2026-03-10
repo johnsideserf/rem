@@ -37,18 +37,18 @@ pub enum PaletteVariant {
 
 // Data Stream: I/O operations (directory scan, file copy)
 const DS_GREEN: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-const DS_AMBER: &[&str] = &["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"];
-const DS_CYAN:  &[&str] = &["⠁", "⠈", "⠐", "⠠", "⢀", "⡀", "⠄", "⠂"];
+const DS_AMBER: &[&str] = &["⠁", "⠈", "⠐", "⠠", "⢀", "⡀", "⠄", "⠂"]; // sparse — colony signal
+const DS_CYAN:  &[&str] = &["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"]; // dense — corporate
 
 // Processing: compute-bound work (recursive size calc, search indexing)
 const PR_GREEN: &[&str] = &["░", "▒", "▓", "█", "▓", "▒", "░"];
-const PR_AMBER: &[&str] = &["◰", "◳", "◲", "◱"];
-const PR_CYAN:  &[&str] = &["╸", "╺", "╸", "╺", " ", "╸", " ", "╺", "╸"];
+const PR_AMBER: &[&str] = &["╸", "╺", "╸", "╺", " ", "╸", " ", "╺", "╸"]; // gaps — colony degradation
+const PR_CYAN:  &[&str] = &["◰", "◳", "◲", "◱"]; // clean — corporate precision
 
 // Heartbeat: persistent system status in header bar
 const HB_GREEN: &[&str] = &["·", "∙", "•", "●", "•", "∙", "·"];
-const HB_AMBER: &[&str] = &["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█", "▇", "▆", "▅", "▄", "▃", "▂", "▁"];
-const HB_CYAN:  &[&str] = &["⡀", "⡀", "⣀", "⣠", "⣤", "⣶", "⣿", "⣶", "⣤", "⣠", "⣀", "⡀", " ", " ", "⡀"];
+const HB_AMBER: &[&str] = &["⡀", "⡀", "⣀", "⣠", "⣤", "⣶", "⣿", "⣶", "⣤", "⣠", "⣀", "⡀", " ", " ", "⡀"]; // gaps — colony dropout
+const HB_CYAN:  &[&str] = &["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█", "▇", "▆", "▅", "▄", "▃", "▂", "▁"]; // smooth — corporate
 
 fn frames_for(kind: ThrobberKind, variant: PaletteVariant) -> &'static [&'static str] {
     match (kind, variant) {

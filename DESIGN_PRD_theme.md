@@ -33,7 +33,7 @@
 Three palette variants, each representing a different unit type. Default is Phosphor Green. Selectable via CLI flag or config.
 
 ### 2.1 Palette A — Phosphor Green (Default)
-*The mainframe. Institutional. Cold. The computer that knows things it won't tell you.*
+*The ship terminal. Nostromo, Sulaco, Covenant. The computer that knows things it won't tell you.*
 
 ```rust
 const BG:           Color = Color::Rgb(3, 3, 3);
@@ -47,8 +47,8 @@ const BORDER_HOT:   Color = Color::Rgb(0, 122, 34);
 const WARN:         Color = Color::Rgb(255, 68, 68);
 ```
 
-### 2.2 Palette B — Amber Corporate
-*The executive terminal. Weyland-Yutani ops. Every access is logged.*
+### 2.2 Palette B — Amber Colony
+*The colony terminal. Hadley's Hope, frontier ops. Dropped one too many times. Still works. Barely.*
 
 ```rust
 const BG:           Color = Color::Rgb(12, 8, 0);
@@ -62,8 +62,8 @@ const BORDER_HOT:   Color = Color::Rgb(128, 88, 0);
 const WARN:         Color = Color::Rgb(255, 68, 68);
 ```
 
-### 2.3 Palette C — Degraded Cyan
-*The field unit. Dropped one too many times. Still works. Barely.*
+### 2.3 Palette C — Corporate Cyan
+*The executive terminal. Weyland-Yutani ops. Clean. Clinical. Every access is logged.*
 
 ```rust
 const BG:           Color = Color::Rgb(1, 10, 13);
@@ -217,30 +217,30 @@ Throbbers indicate background work: recursive size calculation, large file copy,
 **Data Stream** — For ongoing I/O operations (directory scan, file copy).
 
 ```
-Green (mainframe):    ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏
-Amber (corporate):    ⣾ ⣽ ⣻ ⢿ ⡿ ⣟ ⣯ ⣷
-Cyan  (field unit):   ⠁ ⠈ ⠐ ⠠ ⢀ ⡀ ⠄ ⠂
+Green (ship):         ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏
+Amber (colony):       ⠁ ⠈ ⠐ ⠠ ⢀ ⡀ ⠄ ⠂
+Cyan  (corporate):    ⣾ ⣽ ⣻ ⢿ ⡿ ⣟ ⣯ ⣷
 ```
 
 **Processing** — For compute-bound work (recursive size calc, search indexing).
 
 ```
-Green (mainframe):    ░ ▒ ▓ █ ▓ ▒ ░
-Amber (corporate):    ◰ ◳ ◲ ◱
-Cyan  (field unit):   ╸ ╺ ╸ ╺   ╸   ╺ ╸
+Green (ship):         ░ ▒ ▓ █ ▓ ▒ ░
+Amber (colony):       ╸ ╺ ╸ ╺   ╸   ╺ ╸
+Cyan  (corporate):    ◰ ◳ ◲ ◱
 ```
 
-The cyan variant intentionally skips frames (empty entries in the array) to simulate signal degradation.
+The amber variant intentionally skips frames (empty entries in the array) to simulate signal degradation.
 
 **Heartbeat** — Persistent system status indicator in the header bar. Always running. Shows the system is alive.
 
 ```
-Green (mainframe):    ·  ∙  •  ●  •  ∙  ·
-Amber (corporate):    ▁ ▂ ▃ ▄ ▅ ▆ ▇ █ ▇ ▆ ▅ ▄ ▃ ▂ ▁
-Cyan  (field unit):   ⡀ ⡀ ⣀ ⣠ ⣤ ⣶ ⣿ ⣶ ⣤ ⣠ ⣀ ⡀     ⡀
+Green (ship):         ·  ∙  •  ●  •  ∙  ·
+Amber (colony):       ⡀ ⡀ ⣀ ⣠ ⣤ ⣶ ⣿ ⣶ ⣤ ⣠ ⣀ ⡀     ⡀
+Cyan  (corporate):    ▁ ▂ ▃ ▄ ▅ ▆ ▇ █ ▇ ▆ ▅ ▄ ▃ ▂ ▁
 ```
 
-Again, cyan has gaps — the field unit's signal drops out periodically.
+Again, amber has gaps — the colony terminal's signal drops out periodically.
 
 ### 6.2 Throbber Timing
 

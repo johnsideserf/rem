@@ -93,6 +93,7 @@ fn run_loop(
                 // Reset idle timer on any input (#17)
                 app.last_input = std::time::Instant::now();
                 app.idle_active = false;
+                app.idle_locked = false;
                 input::handle_key(app, key);
 
                 if app.should_quit {

@@ -184,15 +184,7 @@ pub fn sparkline_str(values: &[f64], variant: PaletteVariant) -> String {
             }).collect()
         }
         PaletteVariant::Amber => {
-            // Block elements
-            const BLOCKS: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-            values.iter().map(|&v| {
-                let idx = ((v / max) * 8.0).round() as usize;
-                BLOCKS[idx.min(BLOCKS.len() - 1)]
-            }).collect()
-        }
-        PaletteVariant::Cyan => {
-            // Glitchy sparse — randomly skip some frames for degradation feel
+            // Glitchy sparse — colony terminal signal degradation
             const GLITCH: &[char] = &[' ', '⠁', '⠃', '⠇', '⡇', '⡏', '⡟', '⡿', '⣿'];
             values.iter().enumerate().map(|(i, &v)| {
                 // Every 7th sample "drops out" for signal degradation
@@ -202,6 +194,14 @@ pub fn sparkline_str(values: &[f64], variant: PaletteVariant) -> String {
                     let idx = ((v / max) * 8.0).round() as usize;
                     GLITCH[idx.min(GLITCH.len() - 1)]
                 }
+            }).collect()
+        }
+        PaletteVariant::Cyan => {
+            // Block elements — clean corporate display
+            const BLOCKS: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+            values.iter().map(|&v| {
+                let idx = ((v / max) * 8.0).round() as usize;
+                BLOCKS[idx.min(BLOCKS.len() - 1)]
             }).collect()
         }
     }
