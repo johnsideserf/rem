@@ -31,6 +31,12 @@ impl App {
                 self.error = Some((format!("REDESIGNATION ABORTED: {}", e), Instant::now()));
             } else {
                 self.ops_log.push("RENAME", &new_path.to_string_lossy());
+                self.undo_stack.push(crate::app::UndoRecord {
+                    action: "RENAME".to_string(),
+                    original_paths: vec![old_path.clone()],
+                    result_paths: vec![new_path.clone()],
+                });
+                if self.undo_stack.len() > 50 { self.undo_stack.remove(0); }
                 self.load_entries();
             }
         }
@@ -60,6 +66,12 @@ impl App {
             Ok(()) => {
                 let action = if is_dir { "MKDIR" } else { "CREATE" };
                 self.ops_log.push(action, &path.to_string_lossy());
+                self.undo_stack.push(crate::app::UndoRecord {
+                    action: action.to_string(),
+                    original_paths: vec![],
+                    result_paths: vec![path.clone()],
+                });
+                if self.undo_stack.len() > 50 { self.undo_stack.remove(0); }
                 self.load_entries();
             }
             Err(e) => {
@@ -134,6 +146,15 @@ impl App {
             for src in &buffer.paths {
                 self.ops_log.push(action, &src.to_string_lossy());
             }
+            let result_paths: Vec<PathBuf> = buffer.paths.iter()
+                .filter_map(|src| src.file_name().map(|n| dest_dir.join(n)))
+                .collect();
+            self.undo_stack.push(crate::app::UndoRecord {
+                action: action.to_string(),
+                original_paths: buffer.paths.clone(),
+                result_paths,
+            });
+            if self.undo_stack.len() > 50 { self.undo_stack.remove(0); }
             self.visual_marks.clear();
             if buffer.op == OpType::Copy {
                 self.op_buffer = Some(buffer);
@@ -284,6 +305,75 @@ impl App {
             }
             let _ = tx.send(OpMessage::Complete);
         });
+    }
+
+    pub fn undo_last(&mut self) {
+        let record = match self.undo_stack.pop() {
+            Some(r) => r,
+            None => {
+                self.error = Some(("UNDO STACK EMPTY".to_string(), Instant::now()));
+                return;
+            }
+        };
+        match record.action.as_str() {
+            "RENAME" => {
+                if let (Some(new), Some(old)) = (record.result_paths.first(), record.original_paths.first()) {
+                    if let Err(e) = std::fs::rename(new, old) {
+                        self.error = Some((format!("UNDO FAILED: {}", e), Instant::now()));
+                    } else {
+                        self.ops_log.push("UNDO-RENAME", &old.to_string_lossy());
+                        self.error = Some(("UNDO: RENAME REVERSED".to_string(), Instant::now()));
+                        self.load_entries();
+                    }
+                }
+            }
+            "CREATE" | "MKDIR" => {
+                for path in &record.result_paths {
+                    let result = if path.is_dir() {
+                        std::fs::remove_dir(path)
+                    } else {
+                        std::fs::remove_file(path)
+                    };
+                    if let Err(e) = result {
+                        self.error = Some((format!("UNDO FAILED: {}", e), Instant::now()));
+                        return;
+                    }
+                }
+                self.ops_log.push("UNDO-CREATE", "");
+                self.error = Some(("UNDO: CREATION REVERSED".to_string(), Instant::now()));
+                self.load_entries();
+            }
+            "COPY" => {
+                for path in &record.result_paths {
+                    let result = if path.is_dir() {
+                        std::fs::remove_dir_all(path)
+                    } else {
+                        std::fs::remove_file(path)
+                    };
+                    if let Err(e) = result {
+                        self.error = Some((format!("UNDO FAILED: {}", e), Instant::now()));
+                        return;
+                    }
+                }
+                self.ops_log.push("UNDO-COPY", "");
+                self.error = Some(("UNDO: COPY REVERSED".to_string(), Instant::now()));
+                self.load_entries();
+            }
+            "MOVE" => {
+                for (new, old) in record.result_paths.iter().zip(record.original_paths.iter()) {
+                    if let Err(e) = std::fs::rename(new, old) {
+                        self.error = Some((format!("UNDO FAILED: {}", e), Instant::now()));
+                        return;
+                    }
+                }
+                self.ops_log.push("UNDO-MOVE", "");
+                self.error = Some(("UNDO: MOVE REVERSED".to_string(), Instant::now()));
+                self.load_entries();
+            }
+            _ => {
+                self.error = Some(("UNDO: UNSUPPORTED OPERATION".to_string(), Instant::now()));
+            }
+        }
     }
 }
 
