@@ -202,7 +202,7 @@ fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 return;
             }
 
-            // Click to select in file list area
+            // Click to select in file list area; click again to open
             if let Some((lx, ly, _lw, lh)) = app.layout_areas.list_area {
                 let mx = mouse.column;
                 let my = mouse.row;
@@ -210,9 +210,14 @@ fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                     let row = (my - ly) as usize;
                     let target = app.pane().scroll_offset + row;
                     if target < app.pane().filtered_indices.len() {
-                        app.pane_mut().cursor = target;
-                        app.preview_scroll = 0;
-                        app.declassify_tick = Some(0);
+                        if app.pane().cursor == target {
+                            // Already selected — open it
+                            app.enter_selected();
+                        } else {
+                            app.pane_mut().cursor = target;
+                            app.preview_scroll = 0;
+                            app.declassify_tick = Some(0);
+                        }
                     }
                 }
             }

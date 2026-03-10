@@ -505,8 +505,9 @@ fn render_idle_overlay(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     }
 
     // Animated braille art per palette
-    let art_h: u16 = 12;
-    let art_w: u16 = 60;
+    let remaining = (area.y + area.height).saturating_sub(tag_y + 4); // space left below tagline
+    let art_h: u16 = remaining.min(18).max(8); // use up to 18 rows, minimum 8
+    let art_w: u16 = (area.width).min(80).max(40);
     let art_y = tag_y + 2;
     let art_x = area.x + (area.width.saturating_sub(art_w)) / 2;
     if art_y + art_h < area.y + area.height {
@@ -538,17 +539,31 @@ fn render_idle_overlay(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     }
 }
 
-/// Ship terminal idle: horizontal star system chart — planets along an ecliptic with orbiting moons.
+/// Ship terminal idle: rotating 3D planet with elliptical ship orbit.
 fn render_idle_orbits(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
-    use ratatui::widgets::canvas::{Canvas, Line as CanvasLine, Points};
+    use ratatui::widgets::canvas::{Canvas, Points};
+    use std::f64::consts::PI;
 
     let pal = app.palette;
     let tick = app.glitch_tick;
-    let phase = tick as f64 * 0.03;
+    let phase = tick as f64 * 0.02;
 
+    // Canvas coordinate space — use the braille dot grid directly.
+    // Braille: 2 dots per char horizontally, 4 dots per char vertically.
     let w = area.width as f64 * 2.0;
-    let h = 48.0;
-    let cy = h / 2.0; // ecliptic line
+    let h = area.height as f64 * 4.0;
+    let cx = w / 2.0;
+    let cy = h / 2.0;
+
+    // Aspect ratio correction: terminal chars are ~2x tall as wide.
+    // Braille partially compensates (2w x 4h per cell), but the cell itself
+    // is still taller than wide.  Typical terminal font aspect ≈ 1:2 (w:h),
+    // so one braille dot-y is physically ~(1/4 cell_h) and one braille dot-x
+    // is ~(1/2 cell_w).  Net physical ratio of dot-x : dot-y ≈ 1 : 1 when
+    // cell_h = 2 * cell_w.  But in practice cells are closer to 1:1.8, so
+    // y is slightly compressed.  We correct by stretching the x-radius
+    // relative to y-radius.  A factor of ~1.0 to 1.2 works well.
+    let aspect = 1.1_f64; // x stretch factor — >1 widens, making circle rounder
 
     let hot_color = pal.text_hot;
     let mid_color = pal.text_mid;
@@ -556,20 +571,17 @@ fn render_idle_orbits(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     let ring_color = pal.border_mid;
     let bg = pal.bg;
 
-    // Bodies along the ecliptic: (x_frac, radius, num_moons, moon_radii[], moon_speeds[])
-    struct Body {
-        x_frac: f64,
-        size: f64,       // dot cluster size
-        moons: &'static [(f64, f64, f64)], // (orbit_radius, speed, phase_offset)
-    }
+    // Planet radius — sized relative to available canvas height so it fills
+    // a good chunk of the area.  Use ~38% of half-height.
+    let ry = h * 0.38;           // vertical radius in canvas dots
+    let rx = ry * aspect;        // horizontal radius, corrected
 
-    const BODIES: &[Body] = &[
-        Body { x_frac: 0.12, size: 1.0, moons: &[(5.0, 1.8, 0.0)] },                           // small inner
-        Body { x_frac: 0.30, size: 2.0, moons: &[(7.0, 1.0, 1.0), (11.0, 0.6, 3.5)] },         // medium
-        Body { x_frac: 0.52, size: 3.0, moons: &[(8.0, 0.9, 0.5), (13.0, 0.5, 2.0), (17.0, 0.3, 4.5)] }, // gas giant
-        Body { x_frac: 0.74, size: 1.5, moons: &[(6.0, 1.2, 1.8)] },                            // outer
-        Body { x_frac: 0.90, size: 1.0, moons: &[] },                                            // distant rock
-    ];
+    // Orbit semi-axes — ellipse tilted toward the viewer
+    let orbit_ax = rx * 2.2;    // horizontal reach
+    let orbit_ay = ry * 0.65;   // vertical reach (foreshortened)
+
+    let ship_speed = 0.4;
+    let rot_speed = 0.6;
 
     let canvas = Canvas::default()
         .block(Block::default().style(Style::default().bg(bg)))
@@ -578,46 +590,137 @@ fn render_idle_orbits(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         .y_bounds([0.0, h])
         .marker(ratatui::symbols::Marker::Braille)
         .paint(move |ctx| {
-            // Ecliptic line
-            ctx.draw(&CanvasLine {
-                x1: 4.0, y1: cy, x2: w - 4.0, y2: cy,
-                color: dim_color,
-            });
-
-            for body in BODIES {
-                let bx = w * body.x_frac;
-
-                // Planet body — larger bodies get more dots
-                let mut planet_pts = vec![(bx, cy)];
-                if body.size >= 1.5 {
-                    planet_pts.extend_from_slice(&[(bx + 1.0, cy), (bx - 1.0, cy)]);
+            // --- Orbit path split into front (visible) and back (behind planet) ---
+            let orbit_steps = 160;
+            let mut orbit_back: Vec<(f64, f64)> = Vec::new();
+            let mut orbit_front: Vec<(f64, f64)> = Vec::new();
+            for i in 0..orbit_steps {
+                let a = 2.0 * PI * i as f64 / orbit_steps as f64;
+                let ox = cx + orbit_ax * a.cos();
+                let oy = cy + orbit_ay * a.sin();
+                // Is this point occluded by the planet ellipse?
+                let dx = ox - cx;
+                let dy = oy - cy;
+                let inside = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) < 1.0;
+                if a.sin() < 0.0 && !inside {
+                    orbit_back.push((ox, oy));
+                } else if !inside {
+                    orbit_front.push((ox, oy));
                 }
-                if body.size >= 2.5 {
-                    planet_pts.extend_from_slice(&[(bx, cy + 1.0), (bx, cy - 1.0),
-                        (bx + 1.0, cy + 1.0), (bx - 1.0, cy - 1.0)]);
-                }
-                ctx.draw(&Points { coords: &planet_pts, color: hot_color });
+            }
+            ctx.draw(&Points { coords: &orbit_back, color: dim_color });
 
-                // Orbit rings and moons
-                for &(orbit_r, speed, offset) in body.moons {
-                    // Orbit circle (squashed vertically)
-                    let steps = 48;
-                    let mut ring_pts: Vec<(f64, f64)> = Vec::with_capacity(steps);
-                    for i in 0..steps {
-                        let a = 2.0 * std::f64::consts::PI * i as f64 / steps as f64;
-                        ring_pts.push((bx + orbit_r * a.cos(), cy + orbit_r * a.sin() * 0.6));
+            // --- Planet sphere with 3D shading ---
+            let rot_offset = phase * rot_speed;
+
+            let mut lit_pts: Vec<(f64, f64)> = Vec::new();
+            let mut mid_pts: Vec<(f64, f64)> = Vec::new();
+            let mut dark_pts: Vec<(f64, f64)> = Vec::new();
+
+            // Sample the sphere densely with lat/lon
+            let steps = 80;
+            for lat_i in 0..steps {
+                let lat = PI * (lat_i as f64 / steps as f64) - PI / 2.0;
+                let cos_lat = lat.cos();
+                let sin_lat = lat.sin();
+                let lon_steps = ((steps as f64 * cos_lat).abs().max(1.0)) as usize;
+                for lon_i in 0..lon_steps {
+                    let lon = 2.0 * PI * lon_i as f64 / lon_steps as f64 + rot_offset;
+
+                    let sx = cos_lat * lon.cos();
+                    let sy = sin_lat;
+                    let sz = cos_lat * lon.sin();
+
+                    // Cull back-facing hemisphere
+                    if sz > 0.0 {
+                        continue;
                     }
-                    ctx.draw(&Points { coords: &ring_pts, color: ring_color });
 
-                    // Moon
-                    let angle = phase * speed + offset;
-                    let mx = bx + orbit_r * angle.cos();
-                    let my = cy + orbit_r * angle.sin() * 0.6;
-                    ctx.draw(&Points {
-                        coords: &[(mx, my), (mx + 0.5, my)],
-                        color: mid_color,
-                    });
+                    // Project to 2D with aspect correction
+                    let px = cx + sx * rx;
+                    let py = cy + sy * ry;
+
+                    // Shading: light from upper-right
+                    let light_x = 0.6_f64;
+                    let light_y = 0.4_f64;
+                    let light_z = -0.7_f64;
+                    let light_len = (light_x * light_x + light_y * light_y + light_z * light_z).sqrt();
+                    let dot = (sx * light_x + sy * light_y + sz * light_z) / light_len;
+
+                    // Surface bands + storm feature
+                    let band = ((lat * 5.0 + (lon + rot_offset) * 0.3).sin() * 0.15).abs();
+                    let storm_lat = 0.3_f64;
+                    let storm_lon = 1.5_f64 + rot_offset;
+                    let storm_dist = ((lat - storm_lat).powi(2) + (lon - storm_lon).powi(2)).sqrt();
+                    let storm = if storm_dist < 0.4 { 0.12 } else { 0.0 };
+                    let intensity = dot + band + storm;
+
+                    if intensity > 0.25 {
+                        lit_pts.push((px, py));
+                    } else if intensity > -0.1 {
+                        mid_pts.push((px, py));
+                    } else {
+                        dark_pts.push((px, py));
+                    }
                 }
+            }
+
+            ctx.draw(&Points { coords: &dark_pts, color: dim_color });
+            ctx.draw(&Points { coords: &mid_pts, color: mid_color });
+            ctx.draw(&Points { coords: &lit_pts, color: hot_color });
+
+            // --- Atmosphere glow on the lit edge ---
+            let mut atmo_pts: Vec<(f64, f64)> = Vec::new();
+            let atmo_steps = 100;
+            for i in 0..atmo_steps {
+                let a = 2.0 * PI * i as f64 / atmo_steps as f64;
+                let ex = a.cos();
+                let ey = a.sin();
+                let glow = ex * 0.6 + ey * 0.4;
+                if glow > 0.15 {
+                    atmo_pts.push((cx + ex * (rx + 1.5), cy + ey * (ry + 1.5)));
+                }
+            }
+            ctx.draw(&Points { coords: &atmo_pts, color: mid_color });
+
+            // --- Front orbit path ---
+            ctx.draw(&Points { coords: &orbit_front, color: ring_color });
+
+            // --- Ship ---
+            let ship_angle = phase * ship_speed;
+            let ship_x = cx + orbit_ax * ship_angle.cos();
+            let ship_y = cy + orbit_ay * ship_angle.sin();
+            let sdx = ship_x - cx;
+            let sdy = ship_y - cy;
+            let ship_behind = (sdx * sdx) / (rx * rx) + (sdy * sdy) / (ry * ry) < 1.0;
+            if !ship_behind {
+                // Bold cross marker
+                ctx.draw(&Points {
+                    coords: &[
+                        (ship_x, ship_y),
+                        (ship_x + 1.0, ship_y),
+                        (ship_x - 1.0, ship_y),
+                        (ship_x, ship_y + 1.0),
+                        (ship_x, ship_y - 1.0),
+                        (ship_x + 1.0, ship_y + 1.0),
+                        (ship_x - 1.0, ship_y - 1.0),
+                    ],
+                    color: hot_color,
+                });
+                // Trailing wake
+                let mut trail_pts: Vec<(f64, f64)> = Vec::new();
+                for t in 1..10 {
+                    let ta = ship_angle - t as f64 * 0.035;
+                    let tx = cx + orbit_ax * ta.cos();
+                    let ty = cy + orbit_ay * ta.sin();
+                    let tdx = tx - cx;
+                    let tdy = ty - cy;
+                    let occluded = (tdx * tdx) / (rx * rx) + (tdy * tdy) / (ry * ry) < 1.0;
+                    if !occluded {
+                        trail_pts.push((tx, ty));
+                    }
+                }
+                ctx.draw(&Points { coords: &trail_pts, color: mid_color });
             }
         });
 
