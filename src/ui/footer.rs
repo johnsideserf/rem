@@ -185,10 +185,13 @@ fn collect_hints(app: &App) -> Vec<(&'static str, &'static str)> {
                 h.push(("u", "clear"));
             }
             h.push(("r", "rename"));
+            h.push(("o", "new file"));
             h.push(("#", "hash"));
             h.push(("W", "usage"));
             h.push(("s", "sort"));
             h.push(("tab", "panel"));
+            h.push(("[/]", "sidebar"));
+            h.push(("L", "lock"));
             h.push(("t", "theme"));
             h.push(("q", "quit"));
             h

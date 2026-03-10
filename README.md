@@ -62,7 +62,9 @@ A corporate-grade terminal file navigator built in Rust with [ratatui](https://r
 - **Sidebar adjustment** -- `[` / `]` to resize the sidebar panel
 - **File integrity** -- `#` to compute SHA-256 hash of selected file
 - **Disk usage** -- `W` to scan recursive directory size allocation
-- **Boot sequence** -- corporate authentication splash with animated WY mark
+- **Archive browsing** -- inspect zip/tar contents as a virtual read-only directory
+- **Lock screen** -- `L` to activate per-palette animated screensaver
+- **Boot sequence** -- per-palette corporate authentication splash with animated WY mark
 
 ### Display Profiles
 

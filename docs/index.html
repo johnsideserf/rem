@@ -638,7 +638,9 @@
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">DISPLAY PROFILES</span><span class="feature-desc">t to open the theme and symbol set selector</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">FILE INTEGRITY</span><span class="feature-desc"># to compute SHA-256 hash of selected file</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">DISK USAGE</span><span class="feature-desc">W to scan recursive directory size allocation</span></li>
-        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">BOOT SEQUENCE</span><span class="feature-desc">Corporate authentication splash with animated WY mark</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">ARCHIVE BROWSING</span><span class="feature-desc">Inspect zip/tar contents as a virtual read-only directory</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">LOCK SCREEN</span><span class="feature-desc">L to activate per-palette animated screensaver</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">BOOT SEQUENCE</span><span class="feature-desc">Per-palette corporate authentication splash with animated WY mark</span></li>
       </ul>
     </section>
 
@@ -697,37 +699,37 @@
         <div class="symbol-card">
           <div class="symbol-card-name">STANDARD</div>
           <div class="symbol-card-desc">Nerd Font glyphs</div>
-          <div class="symbol-card-preview">&#x25b6; &#x25c6; &#x2713; &#x2588;&#x2591; &#x2192;</div>
+          <div class="symbol-card-preview">&#x25b6; &#x25c6; &#x2713; &#x2588;&#x2591;</div>
         </div>
         <div class="symbol-card">
           <div class="symbol-card-name">ASCII</div>
           <div class="symbol-card-desc">Pure ASCII compat</div>
-          <div class="symbol-card-preview">&gt; * ok #- -&gt;</div>
+          <div class="symbol-card-preview">&gt; * ok #-</div>
         </div>
         <div class="symbol-card">
           <div class="symbol-card-name">BLOCK</div>
           <div class="symbol-card-desc">Heavy geometric</div>
-          <div class="symbol-card-preview">&#x2588;&#x25b6; &#x2588; &#x2588; &#x2588;&#x2592; &#x25b6;</div>
+          <div class="symbol-card-preview">&#x2588;&#x25b6; &#x2588; &#x2588; &#x2588;&#x2592;</div>
         </div>
         <div class="symbol-card">
           <div class="symbol-card-name">MINIMAL</div>
           <div class="symbol-card-desc">Clean, sparse</div>
-          <div class="symbol-card-preview">&#x203a; &#x2022; &#x2022; &#x25cf;&#xb7; &#x203a;</div>
+          <div class="symbol-card-preview">&#x203a; &#x2022; &#x2022; &#x25cf;&#xb7;</div>
         </div>
         <div class="symbol-card">
           <div class="symbol-card-name">PIPELINE</div>
           <div class="symbol-card-desc">Industrial pipes</div>
-          <div class="symbol-card-preview">&#x25b7; &#x25c8; &#x25c6; &#x2588;&#x2591; &#x25b7;</div>
+          <div class="symbol-card-preview">&#x25b7; &#x25c8; &#x25c6; &#x2588;&#x2591;</div>
         </div>
         <div class="symbol-card">
           <div class="symbol-card-name">BRAILLE</div>
           <div class="symbol-card-desc">Dot patterns</div>
-          <div class="symbol-card-preview">&#x28ff; &#x2836; &#x28ff; &#x28ff;&#x2840; &#x2836;</div>
+          <div class="symbol-card-preview">&#x28ff; &#x2836; &#x28ff; &#x28ff;&#x2840;</div>
         </div>
         <div class="symbol-card">
           <div class="symbol-card-name">SCANLINE</div>
           <div class="symbol-card-desc">CRT interlaced</div>
-          <div class="symbol-card-preview">&#x25b8; &#x25c9; &#x25c9; &#x25ae;&#x25af; &#x25b8;</div>
+          <div class="symbol-card-preview">&#x25b8; &#x25c9; &#x25c9; &#x25ae;&#x25af;</div>
         </div>
       </div>
     </section>
@@ -817,14 +819,17 @@
       <div class="config-path">~/.config/rem/config.toml</div>
       <div class="config-block"><span class="config-comment"># Display settings</span>
 <span class="config-key">[appearance]</span>
-<span class="config-key">palette</span> = <span class="config-val">"green"</span>       <span class="config-comment"># green | amber | cyan</span>
-<span class="config-key">symbols</span> = <span class="config-val">"standard"</span>    <span class="config-comment"># standard | ascii | block | minimal | pipeline | braille | scanline</span>
+<span class="config-key">palette</span> = <span class="config-val">"green"</span>           <span class="config-comment"># green | amber | cyan</span>
+<span class="config-key">symbols</span> = <span class="config-val">"standard"</span>        <span class="config-comment"># standard | ascii | block | minimal | pipeline | braille | scanline</span>
 
 <span class="config-comment"># Behavior</span>
 <span class="config-key">[behavior]</span>
-<span class="config-key">show_hidden</span> = <span class="config-val">false</span>
-<span class="config-key">default_panel</span> = <span class="config-val">"info"</span>   <span class="config-comment"># info | preview | hidden</span>
-<span class="config-key">boot_sequence</span> = <span class="config-val">true</span></div>
+<span class="config-key">show_hidden</span> = <span class="config-val">false</span>           <span class="config-comment"># show dotfiles by default</span>
+<span class="config-key">default_panel</span> = <span class="config-val">"info"</span>       <span class="config-comment"># info | preview | hidden</span>
+<span class="config-key">boot_sequence</span> = <span class="config-val">true</span>          <span class="config-comment"># show boot animation on launch</span>
+<span class="config-key">sort_mode</span> = <span class="config-val">"name_asc"</span>       <span class="config-comment"># name_asc | name_desc | size_asc | size_desc | date_newest | date_oldest</span>
+<span class="config-key">glitch_enabled</span> = <span class="config-val">true</span>        <span class="config-comment"># CRT glitch effects per palette</span>
+<span class="config-key">reduce_motion</span> = <span class="config-val">false</span>        <span class="config-comment"># disable animations</span></div>
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════
@@ -846,7 +851,9 @@
       <div class="code-block"><span class="prompt">$ </span><span class="cmd">rem</span>              <span class="comment"># default phosphor green profile</span>
 <span class="prompt">$ </span><span class="cmd">rem --amber</span>      <span class="comment"># amber profile</span>
 <span class="prompt">$ </span><span class="cmd">rem --cyan</span>       <span class="comment"># corporate cyan profile</span>
-<span class="prompt">$ </span><span class="cmd">rem --no-boot</span>    <span class="comment"># skip boot sequence</span></div>
+<span class="prompt">$ </span><span class="cmd">rem --no-boot</span>    <span class="comment"># skip boot sequence</span>
+<span class="prompt">$ </span><span class="cmd">rem --help</span>       <span class="comment"># show usage</span>
+<span class="prompt">$ </span><span class="cmd">rem --version</span>    <span class="comment"># show version</span></div>
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════

@@ -28,6 +28,32 @@ use config::Config;
 
 fn main() -> io::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+
+    // Handle --help and --version before terminal setup
+    for arg in &args {
+        match arg.as_str() {
+            "--help" | "-h" => {
+                println!("rem — Remote Entry Module (Weyland-Yutani Corp.)");
+                println!();
+                println!("USAGE: rem [OPTIONS]");
+                println!();
+                println!("OPTIONS:");
+                println!("  --green     Phosphor green profile (default)");
+                println!("  --amber     Amber colony terminal profile");
+                println!("  --cyan      Corporate cyan profile");
+                println!("  --no-boot   Skip boot sequence");
+                println!("  --help      Show this message");
+                println!("  --version   Show version");
+                std::process::exit(0);
+            }
+            "--version" | "-V" => {
+                println!("rem {}", env!("CARGO_PKG_VERSION"));
+                std::process::exit(0);
+            }
+            _ => {}
+        }
+    }
+
     let cfg = Config::load(&args);
 
     let start_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
@@ -38,6 +64,11 @@ fn main() -> io::Result<()> {
     app.reduce_motion = cfg.reduce_motion;
     app.glitch_enabled = cfg.glitch_enabled;
     app.load_entries(); // re-sort with configured sort mode
+
+    // Show config warnings
+    if let Some(warn) = cfg.warnings.first() {
+        app.error = Some((format!("CONFIG: {}", warn), std::time::Instant::now()));
+    }
 
     // Load bookmarks
     app.marks = marks::load_marks();

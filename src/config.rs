@@ -40,6 +40,7 @@ pub struct Config {
     pub sort_mode: SortMode,
     pub reduce_motion: bool,
     pub glitch_enabled: bool,
+    pub warnings: Vec<String>,
 }
 
 impl Default for Config {
@@ -47,12 +48,13 @@ impl Default for Config {
         Self {
             palette: Palette::phosphor_green(),
             symbols: SymbolSet::for_variant(SymbolVariant::Standard),
-            show_hidden: true,
+            show_hidden: false,
             default_panel: RightPanel::Info,
             boot_sequence: true,
             sort_mode: SortMode::default(),
             reduce_motion: false,
             glitch_enabled: true,
+            warnings: Vec::new(),
         }
     }
 }
@@ -174,9 +176,13 @@ impl Config {
                     }
                     if let Some(p) = &file.appearance.palette {
                         cfg.palette = match p.as_str() {
+                            "green" => Palette::phosphor_green(),
                             "amber" => Palette::amber(),
                             "cyan" => Palette::degraded_cyan(),
-                            _ => Palette::phosphor_green(),
+                            other => {
+                                cfg.warnings.push(format!("unknown palette '{}', using green", other));
+                                Palette::phosphor_green()
+                            }
                         };
                     }
                     if let Some(v) = file.behavior.show_hidden {
@@ -184,9 +190,13 @@ impl Config {
                     }
                     if let Some(p) = &file.behavior.default_panel {
                         cfg.default_panel = match p.as_str() {
+                            "info" => RightPanel::Info,
                             "preview" => RightPanel::Preview,
                             "hidden" => RightPanel::Hidden,
-                            _ => RightPanel::Info,
+                            other => {
+                                cfg.warnings.push(format!("unknown panel '{}', using info", other));
+                                RightPanel::Info
+                            }
                         };
                     }
                     if let Some(v) = file.behavior.boot_sequence {
@@ -200,12 +210,16 @@ impl Config {
                     }
                     if let Some(s) = &file.behavior.sort_mode {
                         cfg.sort_mode = match s.as_str() {
+                            "name_asc" => SortMode::NameAsc,
                             "name_desc" => SortMode::NameDesc,
                             "size_desc" => SortMode::SizeDesc,
                             "size_asc" => SortMode::SizeAsc,
                             "date_newest" => SortMode::DateNewest,
                             "date_oldest" => SortMode::DateOldest,
-                            _ => SortMode::NameAsc,
+                            other => {
+                                cfg.warnings.push(format!("unknown sort_mode '{}', using name_asc", other));
+                                SortMode::NameAsc
+                            }
                         };
                     }
                 }

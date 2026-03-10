@@ -11,7 +11,7 @@ use ratatui::Terminal;
 
 use crate::logo;
 use crate::palette::Palette;
-use crate::throbber::{Throbber, ThrobberKind};
+use crate::throbber::{PaletteVariant, Throbber, ThrobberKind};
 
 struct BootLine {
     label: &'static str,
@@ -19,12 +19,37 @@ struct BootLine {
     value: &'static str,
 }
 
-const BOOT_LINES: &[BootLine] = &[
+/// Ship terminal (Nostromo, Sulaco) — shipboard system init
+const BOOT_GREEN: &[BootLine] = &[
     BootLine { label: "BIOS",      dots: " .............. ", value: "OK" },
     BootLine { label: "MEMORY",    dots: " ............ ", value: "640K" },
     BootLine { label: "DISK",      dots: " .............. ", value: "" },
-    BootLine { label: "INTERFACE", dots: " ......... ", value: "NOMINAL" },
+    BootLine { label: "NAV SYS",   dots: " ........... ", value: "ONLINE" },
 ];
+
+/// Colony terminal (Hadley's Hope) — frontier ops init
+const BOOT_AMBER: &[BootLine] = &[
+    BootLine { label: "BIOS",      dots: " .............. ", value: "OK" },
+    BootLine { label: "MEMORY",    dots: " ............ ", value: "512K" },
+    BootLine { label: "DISK",      dots: " .............. ", value: "" },
+    BootLine { label: "ATMO PROC", dots: " .......... ", value: "NOMINAL" },
+];
+
+/// Corporate terminal (Weyland-Yutani) — executive access init
+const BOOT_CYAN: &[BootLine] = &[
+    BootLine { label: "BIOS",      dots: " .............. ", value: "OK" },
+    BootLine { label: "MEMORY",    dots: " ............ ", value: "2048K" },
+    BootLine { label: "DISK",      dots: " .............. ", value: "" },
+    BootLine { label: "CLEARANCE", dots: " ......... ", value: "GRANTED" },
+];
+
+fn boot_lines_for(variant: PaletteVariant) -> &'static [BootLine] {
+    match variant {
+        PaletteVariant::Green => BOOT_GREEN,
+        PaletteVariant::Amber => BOOT_AMBER,
+        PaletteVariant::Cyan => BOOT_CYAN,
+    }
+}
 
 /// Total logo block lines: logo art (11) + blank + corp name + tagline + rule = 15
 const LOGO_LINE_COUNT: usize = 15;
@@ -35,11 +60,12 @@ pub fn run_boot(
     palette: Palette,
 ) -> io::Result<bool> {
     let mut throbber = Throbber::new(ThrobberKind::DataStream, palette.variant);
+    let boot_lines = boot_lines_for(palette.variant);
     let start = Instant::now();
 
     let mut visible_logo_lines: usize = 0;
     let mut visible_boot_lines: usize = 0;
-    let mut boot_value_shown: Vec<bool> = vec![false; BOOT_LINES.len()];
+    let mut boot_value_shown: Vec<bool> = vec![false; boot_lines.len()];
     let mut disk_resolved = false;
     let mut ready_shown = false;
     let mut phase_timer = Instant::now();
@@ -59,6 +85,23 @@ pub fn run_boot(
         if event::poll(Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
+                    // Flash "BOOT OVERRIDE" feedback
+                    terminal.draw(|f| {
+                        let area = f.area();
+                        f.render_widget(
+                            Block::default().style(Style::default().bg(palette.bg)),
+                            area,
+                        );
+                        let msg = Line::from(Span::styled(
+                            "  BOOT OVERRIDE \u{2014} SEQUENCE BYPASSED",
+                            Style::default().fg(palette.warn).add_modifier(Modifier::BOLD),
+                        ));
+                        f.render_widget(
+                            Paragraph::new(msg),
+                            Rect::new(area.x, area.y + 1, area.width, 1),
+                        );
+                    })?;
+                    std::thread::sleep(Duration::from_millis(200));
                     return Ok(false);
                 }
             }
@@ -82,7 +125,7 @@ pub fn run_boot(
                 }
             }
             Phase::BootLines => {
-                if visible_boot_lines < BOOT_LINES.len() {
+                if visible_boot_lines < boot_lines.len() {
                     if !boot_value_shown[visible_boot_lines] {
                         if sub_elapsed >= Duration::from_millis(100) {
                             if visible_boot_lines == 2 {
@@ -199,7 +242,7 @@ pub fn run_boot(
             }
 
             // Boot check lines
-            for (i, bl) in BOOT_LINES.iter().enumerate() {
+            for (i, bl) in boot_lines.iter().enumerate() {
                 if i >= visible_boot_lines && !(i == visible_boot_lines && boot_value_shown.get(i) == Some(&true)) {
                     if i > visible_boot_lines {
                         break;
