@@ -423,6 +423,7 @@ pub struct FsEntry {
     pub modified: Option<SystemTime>,
     pub is_symlink: bool,
     pub link_target: Option<String>,
+    pub permissions: Option<String>,
 }
 
 /// Animation for file deletion corruption effect (#35).
@@ -1036,6 +1037,7 @@ impl App {
                 modified: None,
                 is_symlink: false,
                 link_target: None,
+                permissions: None,
             }).collect();
             pane.cursor = 0;
             pane.scroll_offset = 0;

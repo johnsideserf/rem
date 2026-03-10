@@ -38,6 +38,34 @@ impl App {
                     let is_dir = meta.as_ref().map_or(false, |m| m.is_dir());
                     let size = meta.as_ref().and_then(|m| if !m.is_dir() { Some(m.len()) } else { None });
                     let modified = meta.as_ref().and_then(|m| m.modified().ok());
+                    // Permissions (#47)
+                    let permissions = {
+                        #[cfg(unix)]
+                        {
+                            use std::os::unix::fs::PermissionsExt;
+                            meta.as_ref().map(|m| {
+                                let mode = m.permissions().mode();
+                                let perms = [
+                                    if mode & 0o400 != 0 { 'r' } else { '-' },
+                                    if mode & 0o200 != 0 { 'w' } else { '-' },
+                                    if mode & 0o100 != 0 { 'x' } else { '-' },
+                                    if mode & 0o040 != 0 { 'r' } else { '-' },
+                                    if mode & 0o020 != 0 { 'w' } else { '-' },
+                                    if mode & 0o010 != 0 { 'x' } else { '-' },
+                                    if mode & 0o004 != 0 { 'r' } else { '-' },
+                                    if mode & 0o002 != 0 { 'w' } else { '-' },
+                                    if mode & 0o001 != 0 { 'x' } else { '-' },
+                                ];
+                                perms.iter().collect::<String>()
+                            })
+                        }
+                        #[cfg(not(unix))]
+                        {
+                            meta.as_ref().map(|m| {
+                                if m.permissions().readonly() { "R".to_string() } else { "RW".to_string() }
+                            })
+                        }
+                    };
                     // Detect broken symlinks
                     let broken = is_symlink && meta.is_none();
                     pane.entries.push(FsEntry {
@@ -48,6 +76,7 @@ impl App {
                         modified,
                         is_symlink,
                         link_target,
+                        permissions,
                     });
                 }
                 // Sort: dirs first, then by current sort mode
