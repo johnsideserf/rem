@@ -189,8 +189,9 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
         ])
         .split(outer[1]);
 
-    breadcrumb::render_pane(f, app, 0, breadcrumb_halves[0], app.active_pane == 0);
-    breadcrumb::render_pane(f, app, 1, breadcrumb_halves[1], app.active_pane == 1);
+    let active = app.active_pane;
+    breadcrumb::render_pane(f, app, 0, breadcrumb_halves[0], active == 0);
+    breadcrumb::render_pane(f, app, 1, breadcrumb_halves[1], active == 1);
 
     // Editor takes over full body in dual-pane mode too
     if app.mode == crate::app::Mode::Edit {

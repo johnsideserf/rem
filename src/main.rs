@@ -176,6 +176,25 @@ fn handle_mouse(app: &mut App, mouse: MouseEvent) {
             app.cursor_down();
         }
         MouseEventKind::Down(MouseButton::Left) => {
+            // Check breadcrumb segment clicks first (#48)
+            let mut nav_target: Option<std::path::PathBuf> = None;
+            if let Some((_, by, _, bh)) = app.layout_areas.breadcrumb_area {
+                if mouse.row >= by && mouse.row < by + bh {
+                    for (start_x, end_x, path) in &app.layout_areas.breadcrumb_segments {
+                        if mouse.column >= *start_x && mouse.column < *end_x {
+                            nav_target = Some(path.clone());
+                            break;
+                        }
+                    }
+                }
+            }
+            if let Some(path) = nav_target {
+                if path.is_dir() {
+                    app.navigate_to(path);
+                }
+                return;
+            }
+
             // Click to select in file list area
             if let Some((lx, ly, _lw, lh)) = app.layout_areas.list_area {
                 let mx = mouse.column;

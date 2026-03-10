@@ -505,6 +505,8 @@ pub struct CommandState {
 pub struct LayoutAreas {
     pub list_area: Option<(u16, u16, u16, u16)>,     // x, y, w, h
     pub breadcrumb_area: Option<(u16, u16, u16, u16)>,
+    /// Breadcrumb click targets: (start_x, end_x, path) for each visible segment (#48).
+    pub breadcrumb_segments: Vec<(u16, u16, std::path::PathBuf)>,
 }
 
 pub struct PaneState {
