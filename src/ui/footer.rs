@@ -87,11 +87,24 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     // Command mode (#41)
     if matches!(app.mode, Mode::Command) {
         let cursor_char = if app.blink_on { app.symbols.text_cursor } else { " " };
-        let cmd_line = Line::from(vec![
+        let mut cmd_spans = vec![
             Span::styled(" MOTHER> ", Style::default().fg(pal.text_hot).bg(pal.surface)),
             Span::styled(app.command_state.input.clone(), Style::default().fg(pal.text_mid).bg(pal.surface)),
-            Span::styled(cursor_char, Style::default().fg(pal.text_hot).bg(pal.surface)),
-        ]);
+        ];
+        // Completion hint (#49)
+        if let Some(idx) = app.command_state.completion_idx {
+            if let Some(completion) = app.command_state.completions.get(idx) {
+                if completion.len() > app.command_state.input.len() {
+                    let hint = &completion[app.command_state.input.len()..];
+                    cmd_spans.push(Span::styled(
+                        hint.to_string(),
+                        Style::default().fg(pal.text_dim).bg(pal.surface),
+                    ));
+                }
+            }
+        }
+        cmd_spans.push(Span::styled(cursor_char, Style::default().fg(pal.text_hot).bg(pal.surface)));
+        let cmd_line = Line::from(cmd_spans);
         let block = Block::default()
             .borders(Borders::TOP)
             .border_type(BorderType::Plain)

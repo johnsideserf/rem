@@ -1208,6 +1208,8 @@ fn handle_command(app: &mut App, key: KeyEvent) {
                     .unwrap_or(app.command_state.input.len());
                 app.command_state.input.drain(byte_idx..next_byte);
             }
+            app.command_state.completions.clear();
+            app.command_state.completion_idx = None;
         }
         (_, KeyCode::Left) => {
             if app.command_state.cursor > 0 {
@@ -1218,6 +1220,65 @@ fn handle_command(app: &mut App, key: KeyEvent) {
             let len = app.command_state.input.chars().count();
             if app.command_state.cursor < len {
                 app.command_state.cursor += 1;
+            }
+        }
+        // Tab completion (#49)
+        (_, KeyCode::Tab) => {
+            if app.command_state.completions.is_empty()
+                || app.command_state.completion_prefix != app.command_state.input
+            {
+                // Generate completions
+                app.command_state.completion_prefix = app.command_state.input.clone();
+                app.command_state.completions.clear();
+                app.command_state.completion_idx = None;
+
+                let input = &app.command_state.input;
+                if input.starts_with("cd ") {
+                    // Path completion
+                    let partial = &input[3..];
+                    let (dir, prefix) = if let Some(pos) = partial.rfind('/').or_else(|| partial.rfind('\\')) {
+                        let base = &partial[..=pos];
+                        let pfx = &partial[pos + 1..];
+                        (app.pane().current_dir.join(base), pfx.to_string())
+                    } else {
+                        (app.pane().current_dir.clone(), partial.to_string())
+                    };
+                    if let Ok(rd) = std::fs::read_dir(&dir) {
+                        for entry in rd.flatten() {
+                            let name = entry.file_name().to_string_lossy().into_owned();
+                            if name.to_lowercase().starts_with(&prefix.to_lowercase()) {
+                                let is_dir = entry.file_type().map_or(false, |t| t.is_dir());
+                                let suffix = if is_dir { "/" } else { "" };
+                                let base_path = if let Some(pos) = partial.rfind('/').or_else(|| partial.rfind('\\')) {
+                                    format!("{}{}{}", &partial[..=pos], name, suffix)
+                                } else {
+                                    format!("{}{}", name, suffix)
+                                };
+                                app.command_state.completions.push(format!("cd {}", base_path));
+                            }
+                        }
+                    }
+                } else {
+                    // Command name completion
+                    let commands = [
+                        "q", "quit", "cd", "set", "sort", "theme", "symbols", "help",
+                    ];
+                    for cmd in &commands {
+                        if cmd.starts_with(input.as_str()) {
+                            app.command_state.completions.push(cmd.to_string());
+                        }
+                    }
+                }
+            }
+            // Cycle through completions
+            if !app.command_state.completions.is_empty() {
+                let idx = match app.command_state.completion_idx {
+                    Some(i) => (i + 1) % app.command_state.completions.len(),
+                    None => 0,
+                };
+                app.command_state.completion_idx = Some(idx);
+                app.command_state.input = app.command_state.completions[idx].clone();
+                app.command_state.cursor = app.command_state.input.chars().count();
             }
         }
         (_, KeyCode::Up) => {
@@ -1252,6 +1313,8 @@ fn handle_command(app: &mut App, key: KeyEvent) {
         (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
             app.command_state.input.clear();
             app.command_state.cursor = 0;
+            app.command_state.completions.clear();
+            app.command_state.completion_idx = None;
         }
         (KeyModifiers::NONE | KeyModifiers::SHIFT, KeyCode::Char(c)) => {
             let byte_idx = app.command_state.input.char_indices()
@@ -1260,6 +1323,8 @@ fn handle_command(app: &mut App, key: KeyEvent) {
                 .unwrap_or(app.command_state.input.len());
             app.command_state.input.insert(byte_idx, c);
             app.command_state.cursor += 1;
+            app.command_state.completions.clear();
+            app.command_state.completion_idx = None;
         }
         _ => {}
     }

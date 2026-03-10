@@ -491,6 +491,10 @@ pub struct CommandState {
     pub cursor: usize,
     pub history: Vec<String>,
     pub history_idx: Option<usize>,
+    /// Tab-completion candidates (#49).
+    pub completions: Vec<String>,
+    pub completion_idx: Option<usize>,
+    pub completion_prefix: String,
 }
 
 /// Layout hit-test areas for mouse support (#38).
@@ -771,6 +775,9 @@ impl App {
                 cursor: 0,
                 history: Vec::new(),
                 history_idx: None,
+                completions: Vec::new(),
+                completion_idx: None,
+                completion_prefix: String::new(),
             },
         };
         app.load_entries();
