@@ -9,6 +9,7 @@ use crate::app::App;
 pub fn should_show(app: &App) -> bool {
     app.bg_operation.is_some() || app.op_feedback.is_some()
         || app.hash_op.is_some() || app.disk_scan.is_some()
+        || app.manifest_flash.is_some()
 }
 
 pub fn render(f: &mut Frame, app: &App, area: Rect) {
@@ -161,6 +162,18 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
             Span::styled(
                 bar,
                 Style::default().fg(pal.text_hot).bg(pal.surface),
+            ),
+        ]
+    } else if app.manifest_flash.is_some() {
+        // Filesystem watcher notification (#79)
+        vec![
+            Span::styled(
+                format!(" {} ", app.symbols.checkmark),
+                Style::default().fg(pal.text_hot).bg(pal.surface),
+            ),
+            Span::styled(
+                "MANIFEST UPDATED",
+                Style::default().fg(pal.text_mid).bg(pal.surface),
             ),
         ]
     } else if let Some(fb) = &app.op_feedback {

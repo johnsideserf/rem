@@ -169,6 +169,9 @@ impl App {
         }
         self.load_entries();
         self.git_info = GitInfo::detect(&dir);
+        if let Some(watcher) = &mut self.dir_watcher {
+            watcher.set_dir(dir.clone());
+        }
         if !self.reduce_motion {
             self.anim_frame = 1;
             self.anim_tick = Instant::now();
