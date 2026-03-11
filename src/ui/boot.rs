@@ -87,6 +87,51 @@ fn build_boot_lines(variant: PaletteVariant) -> Vec<ResolvedBootLine> {
 /// Total logo block lines: logo art (11) + blank + corp name + tagline + rule = 15
 const LOGO_LINE_COUNT: usize = 15;
 
+/// Run a CRT warm-up effect: ramp the screen from black to `palette.bg` over 5 frames.
+/// Skippable on any keypress. Returns `Ok(true)` if completed, `Ok(false)` if skipped.
+pub fn run_warmup(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    palette: Palette,
+) -> io::Result<bool> {
+    const FRAMES: u32 = 5;
+    const FRAME_MS: u64 = 100;
+
+    // Extract target RGB components from palette.bg
+    let (tr, tg, tb) = match palette.bg {
+        ratatui::style::Color::Rgb(r, g, b) => (r, g, b),
+        _ => return Ok(true), // non-RGB bg, skip warmup
+    };
+
+    for frame in 1..=FRAMES {
+        // Check for keypress to skip
+        if event::poll(Duration::from_millis(0))? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press {
+                    return Ok(false);
+                }
+            }
+        }
+
+        // Linearly interpolate from black (0,0,0) to (tr, tg, tb)
+        let r = (tr as u32 * frame / FRAMES) as u8;
+        let g = (tg as u32 * frame / FRAMES) as u8;
+        let b = (tb as u32 * frame / FRAMES) as u8;
+        let color = ratatui::style::Color::Rgb(r, g, b);
+
+        terminal.draw(|f| {
+            let area = f.area();
+            f.render_widget(
+                Block::default().style(Style::default().bg(color)),
+                area,
+            );
+        })?;
+
+        std::thread::sleep(Duration::from_millis(FRAME_MS));
+    }
+
+    Ok(true)
+}
+
 /// Run the boot sequence. Returns true if completed, false if skipped.
 pub fn run_boot(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
