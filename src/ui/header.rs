@@ -14,13 +14,18 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     let item_count = pane.entries.len();
     let mark_count = app.visual_marks.len();
 
-    // Split header: left (status) | right (logo)
-    let badge_width = logo::HEADER_BADGE.chars().count() as u16 + 2;
+    // Split header: left (status) | right (logo/ticker)
+    let right_width = if app.ticker_enabled && !app.ticker_messages.is_empty() {
+        // Give ticker a proportional share of the header
+        (area.width / 3).max(20)
+    } else {
+        logo::HEADER_BADGE.chars().count() as u16 + 2
+    };
     let halves = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Min(30),
-            Constraint::Length(badge_width),
+            Constraint::Length(right_width),
         ])
         .split(area);
 
@@ -185,31 +190,51 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     let left_para = Paragraph::new(Line::from(spans)).block(left_block);
     f.render_widget(left_para, halves[0]);
 
-    // Right side: corporate badge
-    let logo_spans = vec![
-        Span::styled(
-            app.symbols.mark,
-            Style::default().fg(pal.border_hot).bg(pal.surface),
-        ),
-        Span::styled(
-            " WEYLAND-YUTANI ",
-            Style::default().fg(pal.text_mid).bg(pal.surface),
-        ),
-        Span::styled(
-            "CORP ",
-            Style::default().fg(pal.text_hot).bg(pal.surface)
-                .add_modifier(Modifier::BOLD),
-        ),
-    ];
+    // Right side: ticker or corporate badge (#88)
+    if app.ticker_enabled && !app.ticker_messages.is_empty() {
+        // Build concatenated ticker text with separators
+        let separator = " \u{00b7} ";
+        let full_text: String = app.ticker_messages.join(separator);
+        let full_len = full_text.chars().count();
+        let display_width = halves[1].width.saturating_sub(2) as usize;
 
-    let right_block = Block::default()
-        .borders(Borders::BOTTOM)
-        .border_type(BorderType::Plain)
-        .border_style(Style::default().fg(pal.border_mid))
-        .style(Style::default().bg(pal.surface));
+        if full_len > 0 {
+            // Scrolling window into the text (wrapping)
+            let doubled = format!("{}{}{}", full_text, separator, full_text);
+            let offset = app.ticker_offset % (full_len + separator.chars().count());
+            let visible: String = doubled.chars().skip(offset).take(display_width).collect();
 
-    let right_para = Paragraph::new(Line::from(logo_spans))
-        .block(right_block)
-        .alignment(ratatui::layout::Alignment::Right);
-    f.render_widget(right_para, halves[1]);
+            let ticker_spans = vec![
+                Span::styled(
+                    format!(" {}", visible),
+                    Style::default().fg(pal.text_dim).bg(pal.surface),
+                ),
+            ];
+            let right_block = Block::default()
+                .borders(Borders::BOTTOM)
+                .border_type(BorderType::Plain)
+                .border_style(Style::default().fg(pal.border_mid))
+                .style(Style::default().bg(pal.surface));
+            let right_para = Paragraph::new(Line::from(ticker_spans))
+                .block(right_block)
+                .alignment(ratatui::layout::Alignment::Right);
+            f.render_widget(right_para, halves[1]);
+        }
+    } else {
+        // Original corporate badge
+        let logo_spans = vec![
+            Span::styled(app.symbols.mark, Style::default().fg(pal.border_hot).bg(pal.surface)),
+            Span::styled(" WEYLAND-YUTANI ", Style::default().fg(pal.text_mid).bg(pal.surface)),
+            Span::styled("CORP ", Style::default().fg(pal.text_hot).bg(pal.surface).add_modifier(Modifier::BOLD)),
+        ];
+        let right_block = Block::default()
+            .borders(Borders::BOTTOM)
+            .border_type(BorderType::Plain)
+            .border_style(Style::default().fg(pal.border_mid))
+            .style(Style::default().bg(pal.surface));
+        let right_para = Paragraph::new(Line::from(logo_spans))
+            .block(right_block)
+            .alignment(ratatui::layout::Alignment::Right);
+        f.render_widget(right_para, halves[1]);
+    }
 }

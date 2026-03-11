@@ -67,6 +67,10 @@ fn main() -> io::Result<()> {
     app.reduce_motion = cfg.reduce_motion;
     app.glitch_enabled = cfg.glitch_enabled;
     app.mouse_enabled = cfg.mouse_enabled;
+    app.ticker_enabled = cfg.ticker_enabled;
+    if !cfg.ticker_messages.is_empty() {
+        app.ticker_messages = cfg.ticker_messages;
+    }
     app.load_entries(); // re-sort with configured sort mode
 
     // Show config warnings

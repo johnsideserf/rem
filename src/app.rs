@@ -713,6 +713,10 @@ pub struct App {
     // File tagging (#58)
     pub tags: crate::tags::TagStore,
     pub tag_input: String,
+    // Header ticker (#88)
+    pub ticker_messages: Vec<String>,
+    pub ticker_offset: usize,
+    pub ticker_enabled: bool,
 }
 
 impl App {
@@ -806,6 +810,15 @@ impl App {
             undo_stack: Vec::new(),
             tags: crate::tags::TagStore::new(),
             tag_input: String::new(),
+            ticker_messages: vec![
+                "BUILDING BETTER WORLDS".to_string(),
+                "COMPANY PROPERTY — DO NOT DUPLICATE".to_string(),
+                "WEYLAND-YUTANI CORP — EST. 2099".to_string(),
+                "SCIENCE IN THE SERVICE OF MANKIND".to_string(),
+                "OUR BUSINESS IS LIFE ITSELF".to_string(),
+            ],
+            ticker_offset: 0,
+            ticker_enabled: true,
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);
@@ -969,6 +982,10 @@ impl App {
         }
         // CRT glitch (#15)
         self.glitch_tick = self.glitch_tick.wrapping_add(1);
+        // Header ticker scroll (#88)
+        if self.ticker_enabled && self.glitch_tick % 3 == 0 {
+            self.ticker_offset = self.ticker_offset.wrapping_add(1);
+        }
         // Green phosphor trail: track cursor movement, decay ghosts
         let current_cursor = self.pane().cursor;
         if current_cursor != self.prev_cursor_pos {
