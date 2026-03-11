@@ -51,15 +51,37 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     let mut spans = vec![
         Span::styled(" REM", Style::default().fg(pal.text_hot).add_modifier(Modifier::BOLD)),
         Span::styled(format!("  {}  ", app.symbols.separator), Style::default().fg(pal.text_dim)),
-        Span::styled(format!("[{}]", mode_label), Style::default().fg(mode_color).add_modifier(Modifier::BOLD)),
-        Span::styled(format!("  {}  ", app.symbols.separator), Style::default().fg(pal.text_dim)),
-        Span::styled(
-            if app.archive.is_some() { "ARCHIVE" } else { "FILE SYSTEM" },
-            Style::default().fg(if app.archive.is_some() { pal.warn } else { pal.text_mid }),
-        ),
-        Span::styled(format!("  {}  ", app.symbols.separator), Style::default().fg(pal.text_dim)),
-        Span::styled(format!("ITEMS:{}", item_count), Style::default().fg(pal.text_hot)),
     ];
+
+    // Tab indicators (#81)
+    if app.tab_count() > 1 {
+        for i in 0..app.tabs.len() {
+            let is_active = i == app.active_tab;
+            let label = &app.tabs[i].label;
+            let tab_display = if label.chars().count() > 8 {
+                let t: String = label.chars().take(7).collect();
+                format!("{}\u{2026}", t)
+            } else {
+                label.clone()
+            };
+            let color = if is_active { pal.text_hot } else { pal.text_dim };
+            spans.push(Span::styled(
+                format!("[{}:{}]", i + 1, tab_display),
+                Style::default().fg(color),
+            ));
+            spans.push(Span::styled(" ", Style::default()));
+        }
+        spans.push(Span::styled(format!("{}  ", app.symbols.separator), Style::default().fg(pal.text_dim)));
+    }
+
+    spans.push(Span::styled(format!("[{}]", mode_label), Style::default().fg(mode_color).add_modifier(Modifier::BOLD)));
+    spans.push(Span::styled(format!("  {}  ", app.symbols.separator), Style::default().fg(pal.text_dim)));
+    spans.push(Span::styled(
+        if app.archive.is_some() { "ARCHIVE" } else { "FILE SYSTEM" },
+        Style::default().fg(if app.archive.is_some() { pal.warn } else { pal.text_mid }),
+    ));
+    spans.push(Span::styled(format!("  {}  ", app.symbols.separator), Style::default().fg(pal.text_dim)));
+    spans.push(Span::styled(format!("ITEMS:{}", item_count), Style::default().fg(pal.text_hot)));
 
     // Git branch
     if let Some(git) = &app.git_info {
