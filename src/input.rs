@@ -1301,6 +1301,7 @@ fn handle_command(app: &mut App, key: KeyEvent) {
                     // Command name completion
                     let commands = [
                         "q", "quit", "cd", "set", "sort", "theme", "symbols", "help",
+                        "|", "|clear", ">",
                     ];
                     for cmd in &commands {
                         if cmd.starts_with(input.as_str()) {
@@ -1423,6 +1424,115 @@ fn execute_command(app: &mut App, cmd: &str) {
         return;
     }
 
+    // Pipe to external tool: | <command> (#83)
+    if let Some(pipe_cmd) = trimmed.strip_prefix('|') {
+        let pipe_cmd = pipe_cmd.trim();
+        if pipe_cmd == "clear" {
+            app.pipe_filtered = None;
+            app.rebuild_filtered();
+            app.error = Some(("PIPE FILTER CLEARED".to_string(), Instant::now()));
+            return;
+        }
+        if pipe_cmd.is_empty() {
+            app.error = Some(("PIPE COMMAND REQUIRED AFTER |".to_string(), Instant::now()));
+            return;
+        }
+        // Build file list as stdin
+        let pane = app.pane();
+        let file_list: String = pane.entries.iter()
+            .map(|e| e.name.as_str())
+            .collect::<Vec<&str>>()
+            .join("\n");
+
+        let output = if cfg!(windows) {
+            std::process::Command::new("cmd")
+                .args(["/C", pipe_cmd])
+                .current_dir(&pane.current_dir)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+                .and_then(|mut child| {
+                    use std::io::Write;
+                    if let Some(stdin) = child.stdin.as_mut() {
+                        let _ = stdin.write_all(file_list.as_bytes());
+                    }
+                    child.wait_with_output()
+                })
+        } else {
+            std::process::Command::new("sh")
+                .args(["-c", pipe_cmd])
+                .current_dir(&pane.current_dir)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+                .and_then(|mut child| {
+                    use std::io::Write;
+                    if let Some(stdin) = child.stdin.as_mut() {
+                        let _ = stdin.write_all(file_list.as_bytes());
+                    }
+                    child.wait_with_output()
+                })
+        };
+
+        match output {
+            Ok(out) => {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                let filtered_names: Vec<String> = stdout.lines()
+                    .map(|l| l.trim().to_string())
+                    .filter(|l| !l.is_empty())
+                    .collect();
+                let count = filtered_names.len();
+                app.pipe_filtered = Some(filtered_names.clone());
+                // Apply filter: only show entries whose names appear in the output
+                let pane = app.pane_mut();
+                pane.filtered_indices = pane.entries.iter().enumerate()
+                    .filter(|(_, e)| filtered_names.contains(&e.name))
+                    .map(|(i, _)| i)
+                    .collect();
+                pane.cursor = 0;
+                pane.scroll_offset = 0;
+                app.error = Some((format!("PIPE FILTER: {} RESULTS", count), Instant::now()));
+            }
+            Err(e) => {
+                app.error = Some((format!("PIPE FAILURE: {}", e), Instant::now()));
+            }
+        }
+        return;
+    }
+
+    // Write to file: > <path> (#83)
+    if let Some(out_path) = trimmed.strip_prefix('>') {
+        let out_path = out_path.trim();
+        if out_path.is_empty() {
+            app.error = Some(("OUTPUT PATH REQUIRED AFTER >".to_string(), Instant::now()));
+            return;
+        }
+        let pane = app.pane();
+        let resolved = if std::path::Path::new(out_path).is_absolute() {
+            std::path::PathBuf::from(out_path)
+        } else {
+            pane.current_dir.join(out_path)
+        };
+        let file_list: String = pane.filtered_indices.iter()
+            .filter_map(|&i| pane.entries.get(i))
+            .map(|e| e.name.as_str())
+            .collect::<Vec<&str>>()
+            .join("\n");
+        match std::fs::write(&resolved, file_list) {
+            Ok(_) => {
+                app.error = Some((format!("WRITTEN TO {}", out_path), Instant::now()));
+                app.ops_log.push("WRITE", out_path);
+            }
+            Err(e) => {
+                app.error = Some((format!("WRITE FAILURE: {}", e), Instant::now()));
+            }
+        }
+        app.load_entries();
+        return;
+    }
+
     let parts: Vec<&str> = trimmed.splitn(2, ' ').collect();
     match parts.first().copied() {
         Some("q") | Some("quit") => {
@@ -1520,7 +1630,7 @@ fn execute_command(app: &mut App, cmd: &str) {
             }
         }
         Some("help") => {
-            app.error = Some(("COMMANDS: q cd set sort theme symbols shell tag untag help".to_string(), Instant::now()));
+            app.error = Some(("COMMANDS: q cd set sort theme symbols shell tag untag |<cmd> >file help".to_string(), Instant::now()));
         }
         _ => {
             app.error = Some(("UNKNOWN COMMAND \u{2014} TYPE :help".to_string(), Instant::now()));
