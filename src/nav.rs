@@ -130,6 +130,8 @@ impl App {
             }
         }
         self.rebuild_filtered();
+        // Refresh git file statuses (#82)
+        self.git_file_statuses = crate::gitstatus::parse_git_status(&self.pane().current_dir);
     }
 
     pub fn rebuild_filtered(&mut self) {

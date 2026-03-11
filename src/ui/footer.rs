@@ -272,6 +272,7 @@ fn collect_hints(app: &App) -> Vec<(&'static str, &'static str)> {
                 h.push(("^Z", "undo"));
             }
             h.push(("^T", "tag"));
+            h.push(("^G", "git stage"));
             h.push((":", "command"));
             h.push(("^F", "fav"));
             h.push(("L", "lock"));

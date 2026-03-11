@@ -363,6 +363,34 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
                 }
             }
         }
+        // Git stage/unstage (#82)
+        (KeyModifiers::CONTROL, KeyCode::Char('g')) => {
+            if let Some(entry) = app.current_entry() {
+                let name = entry.name.clone();
+                let dir = app.pane().current_dir.clone();
+                if let Some(status) = app.git_file_statuses.get(&name) {
+                    let result = match status {
+                        crate::gitstatus::GitFileStatus::Staged => crate::gitstatus::git_unstage(&dir, &name),
+                        _ => crate::gitstatus::git_stage(&dir, &name),
+                    };
+                    match result {
+                        Ok(()) => {
+                            app.git_file_statuses = crate::gitstatus::parse_git_status(&dir);
+                            app.error = Some(("GIT STATUS UPDATED".to_string(), Instant::now()));
+                        }
+                        Err(e) => app.error = Some((e, Instant::now())),
+                    }
+                } else {
+                    match crate::gitstatus::git_stage(&dir, &name) {
+                        Ok(()) => {
+                            app.git_file_statuses = crate::gitstatus::parse_git_status(&dir);
+                            app.error = Some(("STAGED".to_string(), Instant::now()));
+                        }
+                        Err(e) => app.error = Some((e, Instant::now())),
+                    }
+                }
+            }
+        }
         // Dual-pane diff toggle (#45)
         (KeyModifiers::CONTROL, KeyCode::Char('x')) => {
             if app.dual_pane {
@@ -1300,7 +1328,7 @@ fn handle_command(app: &mut App, key: KeyEvent) {
                 } else {
                     // Command name completion
                     let commands = [
-                        "q", "quit", "cd", "set", "sort", "theme", "symbols", "help",
+                        "q", "quit", "cd", "set", "sort", "theme", "symbols", "git", "help",
                     ];
                     for cmd in &commands {
                         if cmd.starts_with(input.as_str()) {
@@ -1519,8 +1547,57 @@ fn execute_command(app: &mut App, cmd: &str) {
                 app.error = Some(("USAGE: untag <name>".to_string(), Instant::now()));
             }
         }
+        Some("git") => {
+            if let Some(subcmd) = parts.get(1) {
+                let git_parts: Vec<&str> = subcmd.trim().splitn(2, ' ').collect();
+                match git_parts.first().copied() {
+                    Some("status") => {
+                        let dir = app.pane().current_dir.clone();
+                        app.git_file_statuses = crate::gitstatus::parse_git_status(&dir);
+                        let count = app.git_file_statuses.len();
+                        app.error = Some((format!("GIT: {} CHANGES DETECTED", count), Instant::now()));
+                    }
+                    Some("add") => {
+                        let dir = app.pane().current_dir.clone();
+                        match crate::gitstatus::git_stage(&dir, ".") {
+                            Ok(()) => app.error = Some(("GIT: ALL STAGED".to_string(), Instant::now())),
+                            Err(e) => app.error = Some((e, Instant::now())),
+                        }
+                        app.git_file_statuses = crate::gitstatus::parse_git_status(&dir);
+                    }
+                    Some("reset") => {
+                        let dir = app.pane().current_dir.clone();
+                        match crate::gitstatus::git_unstage(&dir, ".") {
+                            Ok(()) => app.error = Some(("GIT: ALL UNSTAGED".to_string(), Instant::now())),
+                            Err(e) => app.error = Some((e, Instant::now())),
+                        }
+                        app.git_file_statuses = crate::gitstatus::parse_git_status(&dir);
+                    }
+                    Some("commit") => {
+                        if let Some(msg) = git_parts.get(1) {
+                            let dir = app.pane().current_dir.clone();
+                            match crate::gitstatus::git_commit(&dir, msg) {
+                                Ok(out) => {
+                                    let display = if out.len() > 60 { format!("{}…", &out[..59]) } else { out };
+                                    app.error = Some((format!("COMMITTED: {}", display), Instant::now()));
+                                }
+                                Err(e) => app.error = Some((e, Instant::now())),
+                            }
+                            app.git_file_statuses = crate::gitstatus::parse_git_status(&dir);
+                        } else {
+                            app.error = Some(("USAGE: git commit <message>".to_string(), Instant::now()));
+                        }
+                    }
+                    _ => {
+                        app.error = Some(("GIT: status|add|reset|commit".to_string(), Instant::now()));
+                    }
+                }
+            } else {
+                app.error = Some(("USAGE: git <status|add|reset|commit>".to_string(), Instant::now()));
+            }
+        }
         Some("help") => {
-            app.error = Some(("COMMANDS: q cd set sort theme symbols shell tag untag help".to_string(), Instant::now()));
+            app.error = Some(("COMMANDS: q cd set sort theme symbols shell tag untag git help".to_string(), Instant::now()));
         }
         _ => {
             app.error = Some(("UNKNOWN COMMAND \u{2014} TYPE :help".to_string(), Instant::now()));

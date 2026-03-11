@@ -713,6 +713,8 @@ pub struct App {
     // File tagging (#58)
     pub tags: crate::tags::TagStore,
     pub tag_input: String,
+    // Git file statuses (#82)
+    pub git_file_statuses: std::collections::HashMap<String, crate::gitstatus::GitFileStatus>,
 }
 
 impl App {
@@ -806,6 +808,7 @@ impl App {
             undo_stack: Vec::new(),
             tags: crate::tags::TagStore::new(),
             tag_input: String::new(),
+            git_file_statuses: std::collections::HashMap::new(),
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);
