@@ -1301,6 +1301,7 @@ fn handle_command(app: &mut App, key: KeyEvent) {
                     // Command name completion
                     let commands = [
                         "q", "quit", "cd", "set", "sort", "theme", "symbols", "help",
+                        "rm", "cp", "mv",
                     ];
                     for cmd in &commands {
                         if cmd.starts_with(input.as_str()) {
@@ -1366,6 +1367,50 @@ fn handle_command(app: &mut App, key: KeyEvent) {
             app.command_state.completion_idx = None;
         }
         _ => {}
+    }
+}
+
+/// Expand a simple glob pattern against entries. Supports * and ? wildcards.
+fn expand_glob(pattern: &str, entries: &[crate::app::FsEntry]) -> Vec<std::path::PathBuf> {
+    entries.iter()
+        .filter(|e| glob_match(pattern, &e.name))
+        .map(|e| e.path.clone())
+        .collect()
+}
+
+fn glob_match(pattern: &str, name: &str) -> bool {
+    let pat: Vec<char> = pattern.chars().collect();
+    let nam: Vec<char> = name.chars().collect();
+    glob_match_inner(&pat, &nam, 0, 0)
+}
+
+fn glob_match_inner(pat: &[char], name: &[char], pi: usize, ni: usize) -> bool {
+    if pi == pat.len() && ni == name.len() { return true; }
+    if pi == pat.len() { return false; }
+    match pat[pi] {
+        '*' => {
+            // Try matching zero or more characters
+            for skip in 0..=(name.len() - ni) {
+                if glob_match_inner(pat, name, pi + 1, ni + skip) {
+                    return true;
+                }
+            }
+            false
+        }
+        '?' => {
+            if ni < name.len() {
+                glob_match_inner(pat, name, pi + 1, ni + 1)
+            } else {
+                false
+            }
+        }
+        c => {
+            if ni < name.len() && name[ni] == c {
+                glob_match_inner(pat, name, pi + 1, ni + 1)
+            } else {
+                false
+            }
+        }
     }
 }
 
@@ -1519,8 +1564,86 @@ fn execute_command(app: &mut App, cmd: &str) {
                 app.error = Some(("USAGE: untag <name>".to_string(), Instant::now()));
             }
         }
+        Some("rm") => {
+            if let Some(pattern) = parts.get(1).map(|s| s.trim()) {
+                let pane = app.pane();
+                let matches = expand_glob(pattern, &pane.entries);
+                if matches.is_empty() {
+                    app.error = Some(("NO MATCHING ASSETS".to_string(), Instant::now()));
+                } else {
+                    app.mode = Mode::Confirm {
+                        action: PendingAction::Delete { paths: matches },
+                    };
+                    app.confirm_timer = Some(Instant::now());
+                }
+            } else {
+                app.error = Some(("USAGE: rm <glob>".to_string(), Instant::now()));
+            }
+        }
+        Some("cp") => {
+            if let Some(args) = parts.get(1) {
+                let cmd_parts: Vec<&str> = args.trim().splitn(2, ' ').collect();
+                if cmd_parts.len() == 2 {
+                    let pattern = cmd_parts[0];
+                    let dest_str = cmd_parts[1];
+                    let pane = app.pane();
+                    let matches = expand_glob(pattern, &pane.entries);
+                    if matches.is_empty() {
+                        app.error = Some(("NO MATCHING ASSETS".to_string(), Instant::now()));
+                    } else {
+                        let dest = if std::path::Path::new(dest_str).is_absolute() {
+                            std::path::PathBuf::from(dest_str)
+                        } else {
+                            pane.current_dir.join(dest_str)
+                        };
+                        for src in &matches {
+                            if let Some(name) = src.file_name() {
+                                let target = dest.join(name);
+                                let _ = std::fs::copy(src, &target);
+                                app.ops_log.push("COPY", &src.to_string_lossy());
+                            }
+                        }
+                        app.error = Some((format!("COPIED {} ASSETS", matches.len()), Instant::now()));
+                        app.load_entries();
+                    }
+                } else {
+                    app.error = Some(("USAGE: cp <glob> <dest>".to_string(), Instant::now()));
+                }
+            }
+        }
+        Some("mv") => {
+            if let Some(args) = parts.get(1) {
+                let cmd_parts: Vec<&str> = args.trim().splitn(2, ' ').collect();
+                if cmd_parts.len() == 2 {
+                    let pattern = cmd_parts[0];
+                    let dest_str = cmd_parts[1];
+                    let pane = app.pane();
+                    let matches = expand_glob(pattern, &pane.entries);
+                    if matches.is_empty() {
+                        app.error = Some(("NO MATCHING ASSETS".to_string(), Instant::now()));
+                    } else {
+                        let dest = if std::path::Path::new(dest_str).is_absolute() {
+                            std::path::PathBuf::from(dest_str)
+                        } else {
+                            pane.current_dir.join(dest_str)
+                        };
+                        for src in &matches {
+                            if let Some(name) = src.file_name() {
+                                let target = dest.join(name);
+                                let _ = std::fs::rename(src, &target);
+                                app.ops_log.push("MOVE", &src.to_string_lossy());
+                            }
+                        }
+                        app.error = Some((format!("RELOCATED {} ASSETS", matches.len()), Instant::now()));
+                        app.load_entries();
+                    }
+                } else {
+                    app.error = Some(("USAGE: mv <glob> <dest>".to_string(), Instant::now()));
+                }
+            }
+        }
         Some("help") => {
-            app.error = Some(("COMMANDS: q cd set sort theme symbols shell tag untag help".to_string(), Instant::now()));
+            app.error = Some(("COMMANDS: q cd set sort theme symbols shell tag untag rm cp mv help".to_string(), Instant::now()));
         }
         _ => {
             app.error = Some(("UNKNOWN COMMAND \u{2014} TYPE :help".to_string(), Instant::now()));
