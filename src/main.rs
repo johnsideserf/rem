@@ -2,6 +2,7 @@ mod app;
 mod archive;
 mod config;
 mod favorites;
+mod frecency;
 mod highlight;
 mod input;
 mod logo;
@@ -83,6 +84,9 @@ fn main() -> io::Result<()> {
     // Load tags (#58)
     app.tags = tags::load_tags();
 
+    // Load frecency (#84)
+    app.frecency = frecency::FrecencyStore::load();
+
     // Setup terminal
     terminal::enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -108,6 +112,9 @@ fn main() -> io::Result<()> {
     } else {
         execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     }
+
+    // Save frecency (#84)
+    app.frecency.save();
 
     // Save bookmarks
     marks::save_marks(&app.marks);
