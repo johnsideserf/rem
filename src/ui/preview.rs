@@ -21,10 +21,26 @@ fn truncate_chars(s: &str, max_chars: usize) -> String {
 
 pub fn render(f: &mut Frame, app: &App, area: Rect) {
     let pal = app.palette;
-    let height = area.height.saturating_sub(2) as usize; // account for border + label
-    let width = area.width.saturating_sub(2) as usize;
+
+    // Minimap split (#86)
+    let minimap_active = app.show_minimap && area.width > 30;
+    let (content_area, minimap_area) = if minimap_active {
+        let minimap_w = 3u16;
+        let content_w = area.width.saturating_sub(minimap_w);
+        (
+            Rect::new(area.x, area.y, content_w, area.height),
+            Some(Rect::new(area.x + content_w, area.y, minimap_w, area.height)),
+        )
+    } else {
+        (area, None)
+    };
+
+    let height = content_area.height.saturating_sub(2) as usize; // account for border + label
+    let width = content_area.width.saturating_sub(2) as usize;
 
     let mut lines: Vec<Line> = Vec::new();
+    // Raw text lines for minimap (only populated for text preview)
+    let mut minimap_lines: Option<Vec<String>> = None;
 
     // Label
     lines.push(Line::from(Span::styled(
@@ -60,7 +76,7 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
             }
 
             // Pad and render
-            let full_height = area.height as usize;
+            let full_height = content_area.height as usize;
             while lines.len() < full_height {
                 lines.push(Line::from(Span::styled("", Style::default().bg(pal.bg))));
             }
@@ -70,7 +86,7 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
                 .border_style(Style::default().fg(pal.border_dim))
                 .style(Style::default().bg(pal.bg));
             let paragraph = Paragraph::new(lines).block(block);
-            f.render_widget(paragraph, area);
+            f.render_widget(paragraph, content_area);
             return;
         }
     }
@@ -126,6 +142,10 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
                         ];
                         hl_spans.extend(highlight::highlight_line(&truncated, &entry.path, &pal));
                         lines.push(Line::from(hl_spans));
+                    }
+                    // Capture raw text lines for minimap (#86)
+                    if minimap_active {
+                        minimap_lines = Some(text_lines);
                     }
                 }
                 PreviewContent::Binary => {
@@ -190,7 +210,7 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     }
 
     // Pad
-    let full_height = area.height as usize;
+    let full_height = content_area.height as usize;
     while lines.len() < full_height {
         lines.push(Line::from(Span::styled(
             "",
@@ -205,5 +225,76 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         .style(Style::default().bg(pal.bg));
 
     let paragraph = Paragraph::new(lines).block(block);
+    f.render_widget(paragraph, content_area);
+
+    // Render minimap (#86)
+    if let Some(mmap_area) = minimap_area {
+        if let Some(ref raw_lines) = minimap_lines {
+            render_minimap(f, app, mmap_area, raw_lines, app.preview_scroll, height);
+        } else {
+            // Fill minimap area with background when no text content
+            let bg_lines: Vec<Line> = (0..mmap_area.height)
+                .map(|_| Line::from(Span::styled("   ", Style::default().bg(pal.bg))))
+                .collect();
+            let bg_para = Paragraph::new(bg_lines);
+            f.render_widget(bg_para, mmap_area);
+        }
+    }
+}
+
+/// Render a 3-column density minimap on the right edge of the preview panel (#86).
+fn render_minimap(
+    f: &mut Frame,
+    app: &App,
+    area: Rect,
+    lines: &[String],
+    scroll: usize,
+    viewport_height: usize,
+) {
+    let pal = app.palette;
+    let total_lines = lines.len().max(1);
+    let map_height = area.height as usize;
+
+    let mut map_lines: Vec<Line> = Vec::new();
+
+    for row in 0..map_height {
+        // Map this row to a range of source lines
+        let start = row * total_lines / map_height;
+        let end = ((row + 1) * total_lines / map_height).min(total_lines);
+
+        // Calculate density: how many non-whitespace chars in this range
+        let mut density: f32 = 0.0;
+        let mut count = 0;
+        for i in start..end {
+            if let Some(line) = lines.get(i) {
+                let non_ws = line.chars().filter(|c| !c.is_whitespace()).count();
+                let total = line.len().max(1);
+                density += non_ws as f32 / total as f32;
+                count += 1;
+            }
+        }
+        if count > 0 { density /= count as f32; }
+
+        // Is this row in the viewport?
+        let in_viewport = start < scroll + viewport_height && end > scroll;
+
+        // Density character using block elements
+        let ch = if density > 0.7 { "\u{2588}" }       // full block
+            else if density > 0.4 { "\u{2593}" }        // dark shade
+            else if density > 0.2 { "\u{2592}" }        // medium shade
+            else if density > 0.05 { "\u{2591}" }       // light shade
+            else { " " };
+
+        let color = if in_viewport { pal.text_mid } else { pal.border_dim };
+        let bg = if in_viewport { pal.surface } else { pal.bg };
+
+        let fill = ch.repeat(area.width as usize);
+        map_lines.push(Line::from(Span::styled(
+            fill,
+            Style::default().fg(color).bg(bg),
+        )));
+    }
+
+    let paragraph = Paragraph::new(map_lines);
     f.render_widget(paragraph, area);
 }

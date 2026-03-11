@@ -363,6 +363,10 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
                 }
             }
         }
+        // Preview minimap toggle (#86)
+        (KeyModifiers::CONTROL, KeyCode::Char('m')) => {
+            app.show_minimap = !app.show_minimap;
+        }
         // Dual-pane diff toggle (#45)
         (KeyModifiers::CONTROL, KeyCode::Char('x')) => {
             if app.dual_pane {
@@ -1447,6 +1451,8 @@ fn execute_command(app: &mut App, cmd: &str) {
             match parts.get(1).map(|s| s.trim()) {
                 Some("hidden") => { app.show_hidden = true; app.rebuild_filtered(); }
                 Some("nohidden") => { app.show_hidden = false; app.rebuild_filtered(); }
+                Some("minimap") => { app.show_minimap = true; }
+                Some("nominimap") => { app.show_minimap = false; }
                 _ => {
                     app.error = Some(("UNKNOWN PARAMETER".to_string(), Instant::now()));
                 }

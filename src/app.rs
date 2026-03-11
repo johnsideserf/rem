@@ -713,6 +713,8 @@ pub struct App {
     // File tagging (#58)
     pub tags: crate::tags::TagStore,
     pub tag_input: String,
+    // Preview minimap (#86)
+    pub show_minimap: bool,
 }
 
 impl App {
@@ -806,6 +808,7 @@ impl App {
             undo_stack: Vec::new(),
             tags: crate::tags::TagStore::new(),
             tag_input: String::new(),
+            show_minimap: false,
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);
