@@ -1,5 +1,6 @@
 mod app;
 mod archive;
+mod comms;
 mod config;
 mod favorites;
 mod highlight;

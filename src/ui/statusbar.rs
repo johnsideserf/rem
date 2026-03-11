@@ -9,6 +9,7 @@ use crate::app::App;
 pub fn should_show(app: &App) -> bool {
     app.bg_operation.is_some() || app.op_feedback.is_some()
         || app.hash_op.is_some() || app.disk_scan.is_some()
+        || app.comms.current.is_some()
 }
 
 pub fn render(f: &mut Frame, app: &App, area: Rect) {
@@ -170,6 +171,22 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
             Span::styled(
                 format!(" {}", fb.label),
                 Style::default().fg(color).bg(pal.surface),
+            ),
+        ]
+    } else if let Some((msg, _)) = &app.comms.current {
+        let throbber_char = app.heartbeat.frame();
+        vec![
+            Span::styled(
+                format!(" {} ", throbber_char),
+                Style::default().fg(pal.text_hot).bg(pal.surface),
+            ),
+            Span::styled(
+                "[COMMS INTERCEPT]",
+                Style::default().fg(pal.text_mid).bg(pal.surface),
+            ),
+            Span::styled(
+                format!("  {}", msg),
+                Style::default().fg(pal.text_dim).bg(pal.surface),
             ),
         ]
     } else {
