@@ -659,6 +659,8 @@ pub struct App {
     // I/O activity throbber (#16)
     pub io_throbber: Throbber,
     pub io_flash_tick: u8,
+    // I/O history for oscilloscope (#77)
+    pub io_history: Vec<f32>,
     // Idle screen (#17)
     pub last_input: Instant,
     pub idle_active: bool,
@@ -767,6 +769,7 @@ impl App {
             border_pulse_tick: 0,
             io_throbber: Throbber::new(ThrobberKind::DataStream, palette.variant),
             io_flash_tick: 0,
+            io_history: vec![0.0; 40],
             last_input: Instant::now(),
             idle_active: false,
             idle_locked: false,
@@ -962,6 +965,12 @@ impl App {
         if self.io_flash_tick > 0 {
             self.io_throbber.tick();
             self.io_flash_tick = self.io_flash_tick.saturating_sub(1);
+        }
+        // I/O history for oscilloscope (#77)
+        let io_val = if self.io_flash_tick > 0 { 1.0 } else { 0.0 };
+        self.io_history.push(io_val);
+        if self.io_history.len() > 40 {
+            self.io_history.remove(0);
         }
         // Idle detection (#17) — don't override manual lock
         if !self.idle_locked {

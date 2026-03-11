@@ -206,6 +206,44 @@ fn render_disks_and_vitals(f: &mut Frame, app: &App, area: Rect) {
         ),
     ]));
 
+    // I/O Waveform oscilloscope (#77)
+    lines.push(Line::from(Span::styled("", Style::default().bg(pal.bg))));
+    lines.push(Line::from(Span::styled(
+        " I/O WAVEFORM",
+        Style::default().fg(pal.text_dim).bg(pal.bg),
+    )));
+    {
+        let osc_width = (area.width as usize).saturating_sub(2).min(40);
+        let samples = &app.io_history;
+        let sample_count = samples.len();
+        for row in 0..2u8 {
+            let threshold = 1.0 - (row as f32 + 0.5) / 2.0;
+            let mut row_str = String::from(" ");
+            for col in 0..osc_width.min(sample_count) {
+                let idx = if sample_count > osc_width { sample_count - osc_width + col } else { col };
+                let val = samples.get(idx).copied().unwrap_or(0.0);
+                let ch = if val >= threshold {
+                    match pal.variant {
+                        crate::throbber::PaletteVariant::Green => '\u{2847}',
+                        crate::throbber::PaletteVariant::Amber => '\u{2588}',
+                        crate::throbber::PaletteVariant::Cyan => '\u{2580}',
+                    }
+                } else if val >= threshold * 0.5 {
+                    match pal.variant {
+                        crate::throbber::PaletteVariant::Green => '\u{2801}',
+                        crate::throbber::PaletteVariant::Amber => '\u{2584}',
+                        crate::throbber::PaletteVariant::Cyan => '\u{2581}',
+                    }
+                } else {
+                    ' '
+                };
+                row_str.push(ch);
+            }
+            let color = if row == 0 { pal.text_hot } else { pal.text_mid };
+            lines.push(Line::from(Span::styled(row_str, Style::default().fg(color).bg(pal.bg))));
+        }
+    }
+
     // Pad
     let height = area.height as usize;
     while lines.len() < height {

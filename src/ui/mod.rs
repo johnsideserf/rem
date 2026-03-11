@@ -50,7 +50,7 @@ fn telemetry_panel_height(app: &App) -> usize {
     // but also need at least 5 for network side (TX, RX, blank, LINK, pad)
     let left_height = disk_rows + 3;
     let right_height = 4;
-    left_height.max(right_height) + 1 // +1 for top border
+    left_height.max(right_height) + 1 + 4 // +1 for top border, +4 for oscilloscope
 }
 
 fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
