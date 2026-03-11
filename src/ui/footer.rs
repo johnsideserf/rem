@@ -360,6 +360,13 @@ fn collect_hints(app: &App) -> Vec<(&'static str, &'static str)> {
                 ("esc", "cancel"),
             ]
         }
+        Mode::FileDiff => {
+            vec![
+                ("j/k", "scroll"),
+                ("g/G", "top/bottom"),
+                ("esc", "exit"),
+            ]
+        }
         Mode::Command => {
             vec![] // rendered separately
         }

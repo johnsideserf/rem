@@ -48,6 +48,7 @@ pub enum Mode {
     OpsLog,               // operations log viewer (#43)
     Command,              // MU-TH-UR command mode (#41)
     TagInput,             // typing a tag name (#58)
+    FileDiff,             // side-by-side file diff view (#85)
 }
 
 #[derive(PartialEq, Eq, Clone)]
@@ -713,6 +714,8 @@ pub struct App {
     // File tagging (#58)
     pub tags: crate::tags::TagStore,
     pub tag_input: String,
+    // File diff view (#85)
+    pub file_diff: Option<crate::diff::DiffView>,
 }
 
 impl App {
@@ -806,6 +809,7 @@ impl App {
             undo_stack: Vec::new(),
             tags: crate::tags::TagStore::new(),
             tag_input: String::new(),
+            file_diff: None,
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);

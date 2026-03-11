@@ -1,6 +1,7 @@
 mod app;
 mod archive;
 mod config;
+mod diff;
 mod favorites;
 mod highlight;
 mod input;

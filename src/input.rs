@@ -43,6 +43,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         Mode::Edit => handle_edit(app, key),
         Mode::OpsLog => handle_ops_log(app, key),
         Mode::Command => handle_command(app, key),
+        Mode::FileDiff => handle_diff(app, key),
         Mode::TagInput => handle_tag_input(app, key),
     }
 }
@@ -1300,7 +1301,7 @@ fn handle_command(app: &mut App, key: KeyEvent) {
                 } else {
                     // Command name completion
                     let commands = [
-                        "q", "quit", "cd", "set", "sort", "theme", "symbols", "help",
+                        "q", "quit", "cd", "set", "sort", "theme", "symbols", "diff", "help",
                     ];
                     for cmd in &commands {
                         if cmd.starts_with(input.as_str()) {
@@ -1519,8 +1520,37 @@ fn execute_command(app: &mut App, cmd: &str) {
                 app.error = Some(("USAGE: untag <name>".to_string(), Instant::now()));
             }
         }
+        Some("diff") => {
+            if let Some(args) = parts.get(1) {
+                let files: Vec<&str> = args.trim().splitn(2, ' ').collect();
+                if files.len() == 2 {
+                    let dir = app.pane().current_dir.clone();
+                    let p1 = if std::path::Path::new(files[0]).is_absolute() {
+                        std::path::PathBuf::from(files[0])
+                    } else {
+                        dir.join(files[0])
+                    };
+                    let p2 = if std::path::Path::new(files[1]).is_absolute() {
+                        std::path::PathBuf::from(files[1])
+                    } else {
+                        dir.join(files[1])
+                    };
+                    match crate::diff::DiffView::from_files(&p1, &p2) {
+                        Ok(dv) => {
+                            app.file_diff = Some(dv);
+                            app.mode = Mode::FileDiff;
+                        }
+                        Err(e) => app.error = Some((e, Instant::now())),
+                    }
+                } else {
+                    app.error = Some(("USAGE: diff <file1> <file2>".to_string(), Instant::now()));
+                }
+            } else {
+                app.error = Some(("USAGE: diff <file1> <file2>".to_string(), Instant::now()));
+            }
+        }
         Some("help") => {
-            app.error = Some(("COMMANDS: q cd set sort theme symbols shell tag untag help".to_string(), Instant::now()));
+            app.error = Some(("COMMANDS: q cd set sort theme symbols shell tag untag diff help".to_string(), Instant::now()));
         }
         _ => {
             app.error = Some(("UNKNOWN COMMAND \u{2014} TYPE :help".to_string(), Instant::now()));
@@ -1551,6 +1581,41 @@ fn handle_tag_input(app: &mut App, key: KeyEvent) {
         }
         (KeyModifiers::NONE | KeyModifiers::SHIFT, KeyCode::Char(c)) => {
             app.tag_input.push(c);
+        }
+        _ => {}
+    }
+}
+
+/// Handle file diff view (#85).
+fn handle_diff(app: &mut App, key: KeyEvent) {
+    match (key.modifiers, key.code) {
+        (_, KeyCode::Esc) | (_, KeyCode::Char('q')) => {
+            app.file_diff = None;
+            app.mode = Mode::Normal;
+        }
+        (_, KeyCode::Char('j')) | (_, KeyCode::Down) => {
+            if let Some(diff) = &mut app.file_diff {
+                if diff.scroll + 1 < diff.max_lines {
+                    diff.scroll += 1;
+                }
+            }
+        }
+        (_, KeyCode::Char('k')) | (_, KeyCode::Up) => {
+            if let Some(diff) = &mut app.file_diff {
+                if diff.scroll > 0 {
+                    diff.scroll -= 1;
+                }
+            }
+        }
+        (_, KeyCode::Char('g')) => {
+            if let Some(diff) = &mut app.file_diff {
+                diff.scroll = 0;
+            }
+        }
+        (KeyModifiers::SHIFT, KeyCode::Char('G')) => {
+            if let Some(diff) = &mut app.file_diff {
+                diff.scroll = diff.max_lines.saturating_sub(1);
+            }
         }
         _ => {}
     }
