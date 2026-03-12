@@ -32,6 +32,42 @@ fn trunc_pad(s: &str, max_chars: usize, pad_to: usize) -> String {
 }
 
 
+/// Return an animated color override for special file type badges (#87).
+fn animated_badge_color(entry: &FsEntry, tick: u32, glitch_enabled: bool, reduce_motion: bool, pal: &crate::palette::Palette) -> Option<Color> {
+    if !glitch_enabled || reduce_motion {
+        return None;
+    }
+    let name_lower = entry.name.to_lowercase();
+
+    // Executables: pulse between text_hot and text_mid every 4 ticks
+    let is_exec = name_lower.ends_with(".exe") || name_lower.ends_with(".sh")
+        || name_lower.ends_with(".bat") || name_lower.ends_with(".cmd")
+        || name_lower.ends_with(".app") || name_lower.ends_with(".bin");
+    if is_exec {
+        return Some(if (tick / 4) % 2 == 0 { pal.text_hot } else { pal.text_mid });
+    }
+
+    // Encrypted/key files: flash warn periodically
+    let is_secret = name_lower.ends_with(".pem") || name_lower.ends_with(".key")
+        || name_lower.ends_with(".p12") || name_lower.ends_with(".pfx")
+        || name_lower.ends_with(".keystore") || name_lower.ends_with(".jks")
+        || entry.is_classified;
+    if is_secret {
+        return Some(if (tick / 5) % 3 == 0 { pal.warn } else { pal.text_dim });
+    }
+
+    // Config files: subtle border_mid pulse
+    let is_config = name_lower.ends_with(".toml") || name_lower.ends_with(".yml")
+        || name_lower.ends_with(".yaml") || name_lower.ends_with(".json")
+        || name_lower.ends_with(".ini") || name_lower.ends_with(".conf")
+        || name_lower.ends_with(".cfg");
+    if is_config {
+        return Some(if (tick / 5) % 2 == 0 { pal.border_mid } else { pal.text_dim });
+    }
+
+    None
+}
+
 pub fn render(f: &mut Frame, app: &App, area: Rect) {
     if app.tree_mode && !app.tree_nodes.is_empty() {
         render_tree(f, app, area);
@@ -328,9 +364,11 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
         // Type badge
         if show_type {
             let badge = file_type_badge(entry);
+            let badge_color = animated_badge_color(entry, app.glitch_tick, app.glitch_enabled, app.reduce_motion, &pal)
+                .unwrap_or(pal.text_dim);
             spans.push(Span::styled(
                 format!("{:>5}", badge),
-                Style::default().fg(pal.text_dim).bg(row_bg),
+                Style::default().fg(badge_color).bg(row_bg),
             ));
         }
 
