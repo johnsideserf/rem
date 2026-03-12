@@ -967,7 +967,7 @@ impl App {
             self.io_flash_tick = self.io_flash_tick.saturating_sub(1);
         }
         // I/O history for oscilloscope (#77)
-        let io_val = if self.io_flash_tick > 0 { 1.0 } else { 0.0 };
+        let io_val = (self.io_flash_tick as f32) / 5.0;
         self.io_history.push(io_val);
         if self.io_history.len() > 40 {
             self.io_history.remove(0);
