@@ -175,6 +175,7 @@ impl App {
         if let Some(watcher) = &mut self.dir_watcher {
             watcher.set_dir(dir.clone());
         }
+        self.frecency.record_visit(&dir.to_string_lossy());
         if !self.reduce_motion {
             self.anim_frame = 1;
             self.anim_tick = Instant::now();

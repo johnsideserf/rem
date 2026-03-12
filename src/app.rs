@@ -740,6 +740,8 @@ pub struct App {
     pub active_tab: usize,
     // Git file statuses (#82)
     pub git_file_statuses: std::collections::HashMap<String, crate::gitstatus::GitFileStatus>,
+    // Frecency smart bookmarks (#84)
+    pub frecency: crate::frecency::FrecencyStore,
 }
 
 impl App {
@@ -843,6 +845,7 @@ impl App {
             tabs: Vec::new(),
             active_tab: 0,
             git_file_statuses: std::collections::HashMap::new(),
+            frecency: crate::frecency::FrecencyStore::new(),
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);

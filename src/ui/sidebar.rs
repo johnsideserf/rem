@@ -264,6 +264,35 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         }
     }
 
+    // Frecency section (#84)
+    {
+        let top = app.frecency.top_dirs(5);
+        if !top.is_empty() {
+            lines.push(Line::from(Span::raw("")));
+            lines.push(Line::from(Span::styled(
+                " F R E Q U E N T",
+                Style::default().fg(pal.text_dim).bg(pal.bg),
+            )));
+            for (path_str, _score) in &top {
+                let dir_name = std::path::Path::new(path_str)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| path_str.clone());
+                let max_w = width.saturating_sub(4);
+                let display = if dir_name.chars().count() > max_w {
+                    let t: String = dir_name.chars().take(max_w.saturating_sub(1)).collect();
+                    format!("{}\u{2026}", t)
+                } else {
+                    dir_name
+                };
+                lines.push(Line::from(Span::styled(
+                    format!(" {}", display),
+                    Style::default().fg(pal.text_mid).bg(pal.bg),
+                )));
+            }
+        }
+    }
+
     // Pad to fill area
     let height = area.height as usize;
     while lines.len() < height {

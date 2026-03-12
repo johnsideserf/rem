@@ -3,6 +3,7 @@ mod archive;
 mod comms;
 mod config;
 mod favorites;
+mod frecency;
 mod gitstatus;
 mod highlight;
 mod input;
@@ -93,6 +94,9 @@ fn main() -> io::Result<()> {
         session::apply_session(&mut app, sess);
     }
 
+    // Load frecency (#84)
+    app.frecency = frecency::FrecencyStore::load();
+
     // Setup terminal
     terminal::enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -124,6 +128,9 @@ fn main() -> io::Result<()> {
 
     // Save session (#80)
     session::save_session(&app);
+
+    // Save frecency (#84)
+    app.frecency.save();
 
     // Save bookmarks
     marks::save_marks(&app.marks);
