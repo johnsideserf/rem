@@ -7,7 +7,7 @@ use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 use crate::app::App;
 use crate::sysmon::{cpu_sparkline_str, format_capacity, format_throughput, sparkline_str};
 
-pub fn render(f: &mut Frame, app: &App, area: Rect) {
+pub fn render(f: &mut Frame, app: &mut App, area: Rect) {
     if app.sysmon.is_none() {
         return;
     }
@@ -255,7 +255,7 @@ fn render_disks_and_vitals(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(paragraph, area);
 }
 
-fn render_network(f: &mut Frame, app: &App, area: Rect) {
+fn render_network(f: &mut Frame, app: &mut App, area: Rect) {
     let pal = app.palette;
     let sysmon = app.sysmon.as_ref().unwrap();
 
@@ -334,8 +334,19 @@ fn render_network(f: &mut Frame, app: &App, area: Rect) {
     if remaining > 0 && anim_width > 4 {
         lines.push(Line::from(Span::styled("", Style::default().bg(pal.bg))));
         let anim_rows = remaining.saturating_sub(1);
+        // Seed GoL grid if needed (cyan palette)
+        let dot_w = anim_width * 2;
+        let dot_h = anim_rows * 4;
+        if matches!(pal.variant, crate::throbber::PaletteVariant::Cyan) {
+            let needs_seed = app.gol_grid.is_empty()
+                || app.gol_grid.len() != dot_h
+                || app.gol_grid[0].len() != dot_w;
+            if needs_seed {
+                app.seed_gol(dot_w, dot_h);
+            }
+        }
         let tick = app.glitch_tick as usize;
-        let anim_lines = render_telemetry_animation(pal, tick, anim_width, anim_rows);
+        let anim_lines = render_telemetry_animation(app, tick, anim_width, anim_rows);
         for (text, color) in anim_lines {
             lines.push(Line::from(Span::styled(
                 format!(" {}", text),
@@ -362,18 +373,19 @@ fn render_network(f: &mut Frame, app: &App, area: Rect) {
 /// Generate per-palette braille animation for the network panel.
 /// Returns Vec<(String, Color)> — one entry per row.
 fn render_telemetry_animation(
-    pal: crate::palette::Palette,
+    app: &App,
     tick: usize,
     width: usize,
     rows: usize,
 ) -> Vec<(String, ratatui::style::Color)> {
+    let pal = app.palette;
     if rows == 0 || width == 0 {
         return vec![];
     }
     match pal.variant {
         crate::throbber::PaletteVariant::Green => render_radar_sweep(pal, tick, width, rows),
         crate::throbber::PaletteVariant::Amber => render_seismograph(pal, tick, width, rows),
-        crate::throbber::PaletteVariant::Cyan => render_data_matrix(pal, tick, width, rows),
+        crate::throbber::PaletteVariant::Cyan => render_game_of_life(app, width, rows),
     }
 }
 
@@ -459,84 +471,23 @@ fn render_seismograph(
     encode_braille_grid(&grid, rows, width, pal.text_hot)
 }
 
-/// Cyan: data matrix — scattered dots and glyphs shifting in a grid pattern.
-/// Sparse, clinical, with cells that flicker on/off like a live data feed.
-fn render_data_matrix(
-    pal: crate::palette::Palette,
-    tick: usize,
+/// Cyan: Conway's Game of Life cellular automaton.
+/// Reads live state from app.gol_grid, encodes to braille.
+fn render_game_of_life(
+    app: &App,
     width: usize,
     rows: usize,
 ) -> Vec<(String, ratatui::style::Color)> {
+    let pal = app.palette;
     let dot_h = rows * 4;
     let dot_w = width * 2;
+
+    // Build grid from GoL state (may be different size — clamp to fit)
     let mut grid = vec![vec![0u8; dot_w]; dot_h];
-
-    // Sparse cell grid — each "cell" is ~4x4 dots
-    let cell_w = 4;
-    let cell_h = 4;
-    let cols_count = dot_w / cell_w;
-    let rows_count = dot_h / cell_h;
-
-    for cy in 0..rows_count {
-        for cx in 0..cols_count {
-            // Hash determines if this cell is active at this tick
-            let seed = cx.wrapping_mul(7919).wrapping_add(cy.wrapping_mul(104729));
-            let phase = seed.wrapping_mul(31) % 17;
-            let active = ((tick + phase) / 3) % 5 != 0; // ~80% on, flickering
-
-            if !active { continue; }
-
-            // Pattern within active cell varies by hash
-            let pattern = (seed.wrapping_mul(2654435761)) % 6;
-            let bx = cx * cell_w;
-            let by = cy * cell_h;
-
-            match pattern {
-                0 => {
-                    // Single dot — center
-                    let px = bx + cell_w / 2;
-                    let py = by + cell_h / 2;
-                    if px < dot_w && py < dot_h { grid[py][px] = 2; }
-                }
-                1 => {
-                    // Cross
-                    for i in 0..cell_w.min(cell_h) {
-                        let mid = cell_w / 2;
-                        if bx + mid < dot_w && by + i < dot_h { grid[by + i][bx + mid] = 2; }
-                        if bx + i < dot_w && by + mid < dot_h { grid[by + mid][bx + i] = 2; }
-                    }
-                }
-                2 => {
-                    // Corner dots
-                    for &(ox, oy) in &[(0,0), (cell_w-1, 0), (0, cell_h-1), (cell_w-1, cell_h-1)] {
-                        if bx+ox < dot_w && by+oy < dot_h { grid[by+oy][bx+ox] = 1; }
-                    }
-                }
-                3 => {
-                    // Horizontal bar
-                    let mid_y = by + cell_h / 2;
-                    if mid_y < dot_h {
-                        for i in 0..cell_w {
-                            if bx + i < dot_w { grid[mid_y][bx + i] = 3; }
-                        }
-                    }
-                }
-                4 => {
-                    // Diagonal
-                    for i in 0..cell_w.min(cell_h) {
-                        if bx + i < dot_w && by + i < dot_h { grid[by + i][bx + i] = 2; }
-                    }
-                }
-                _ => {
-                    // Scatter — random dots in the cell
-                    for i in 0..3 {
-                        let dx = (seed.wrapping_mul(i + 1).wrapping_add(tick)) % cell_w;
-                        let dy = (seed.wrapping_mul(i + 7).wrapping_add(tick / 2)) % cell_h;
-                        if bx + dx < dot_w && by + dy < dot_h {
-                            grid[by + dy][bx + dx] = if i == 0 { 3 } else { 1 };
-                        }
-                    }
-                }
+    for y in 0..dot_h {
+        for x in 0..dot_w {
+            if y < app.gol_grid.len() && x < app.gol_grid[0].len() && app.gol_grid[y][x] {
+                grid[y][x] = 2;
             }
         }
     }

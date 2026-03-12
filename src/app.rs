@@ -673,6 +673,9 @@ pub struct App {
     pub io_flash_tick: u8,
     // I/O history for oscilloscope (#77)
     pub io_history: Vec<f32>,
+    // Game of Life grid for cyan telemetry animation
+    pub gol_grid: Vec<Vec<bool>>,
+    pub gol_generation: u32,
     // Idle screen (#17)
     pub last_input: Instant,
     pub last_tick: Instant,
@@ -807,6 +810,8 @@ impl App {
             io_throbber: Throbber::new(ThrobberKind::DataStream, palette.variant),
             io_flash_tick: 0,
             io_history: vec![0.0; 40],
+            gol_grid: Vec::new(),
+            gol_generation: 0,
             last_input: Instant::now(),
             last_tick: Instant::now(),
             idle_active: false,
@@ -977,6 +982,56 @@ impl App {
     /// Number of tabs (at least 1) (#81).
     pub fn tab_count(&self) -> usize {
         self.tabs.len().max(1)
+    }
+
+    /// Advance the Game of Life grid by one generation.
+    fn tick_gol(&mut self) {
+        let h = self.gol_grid.len();
+        if h == 0 { return; }
+        let w = self.gol_grid[0].len();
+        if w == 0 { return; }
+
+        let mut next = vec![vec![false; w]; h];
+        let mut alive = 0u32;
+        for y in 0..h {
+            for x in 0..w {
+                let mut neighbors = 0u8;
+                for dy in [h - 1, 0, 1] {
+                    for dx in [w - 1, 0, 1] {
+                        if dy == 0 && dx == 0 { continue; }
+                        if self.gol_grid[(y + dy) % h][(x + dx) % w] {
+                            neighbors += 1;
+                        }
+                    }
+                }
+                next[y][x] = matches!(
+                    (self.gol_grid[y][x], neighbors),
+                    (true, 2) | (true, 3) | (false, 3)
+                );
+                if next[y][x] { alive += 1; }
+            }
+        }
+        self.gol_generation += 1;
+        self.gol_grid = next;
+
+        // Reseed if population dies out or stagnates
+        if alive < 3 || (self.gol_generation > 200 && alive < (h * w) as u32 / 50) {
+            self.seed_gol(w, h);
+        }
+    }
+
+    /// Seed the GoL grid with an initial pattern.
+    pub fn seed_gol(&mut self, w: usize, h: usize) {
+        self.gol_grid = vec![vec![false; w]; h];
+        self.gol_generation = 0;
+        // Scatter ~25% live cells using LCG
+        let mut rng = self.glitch_tick;
+        for y in 0..h {
+            for x in 0..w {
+                rng = rng.wrapping_mul(1103515245).wrapping_add(12345);
+                self.gol_grid[y][x] = (rng >> 16) % 4 == 0;
+            }
+        }
     }
 
     pub fn tick(&mut self) {
@@ -1150,6 +1205,10 @@ impl App {
         self.distress_active = now.duration_since(self.last_input).as_secs() >= 300;
         // CRT glitch (#15)
         self.glitch_tick = self.glitch_tick.wrapping_add(1);
+        // Game of Life evolution for cyan telemetry (#77)
+        if self.show_telemetry && matches!(self.palette.variant, crate::throbber::PaletteVariant::Cyan) {
+            self.tick_gol();
+        }
         // Header ticker scroll (#88)
         if self.ticker_enabled && self.glitch_tick % 3 == 0 {
             self.ticker_offset = self.ticker_offset.wrapping_add(1);
