@@ -12,6 +12,9 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         app.anim_frame = 0;
     }
 
+    // Dismiss comms on input (#74)
+    app.comms.dismiss();
+
     // Dismiss error on any key
     if app.error.is_some() {
         app.error = None;

@@ -713,6 +713,8 @@ pub struct App {
     // File tagging (#58)
     pub tags: crate::tags::TagStore,
     pub tag_input: String,
+    // Comms intercept (#74)
+    pub comms: crate::comms::CommsState,
 }
 
 impl App {
@@ -806,6 +808,7 @@ impl App {
             undo_stack: Vec::new(),
             tags: crate::tags::TagStore::new(),
             tag_input: String::new(),
+            comms: crate::comms::CommsState::new(),
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);
@@ -967,6 +970,9 @@ impl App {
         if !self.idle_locked {
             self.idle_active = now.duration_since(self.last_input).as_secs() >= 45;
         }
+        // Comms intercept (#74)
+        let idle_secs = now.duration_since(self.last_input).as_secs();
+        self.comms.tick(idle_secs);
         // CRT glitch (#15)
         self.glitch_tick = self.glitch_tick.wrapping_add(1);
         // Green phosphor trail: track cursor movement, decay ghosts
