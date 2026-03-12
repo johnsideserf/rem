@@ -10,6 +10,7 @@ mod statusbar;
 mod telemetry;
 mod footer;
 pub mod theme_picker;
+mod comms_selector;
 mod disk_usage;
 
 use ratatui::Frame;
@@ -133,6 +134,10 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
 
     if app.show_theme_picker {
         theme_picker::render(f, app, area);
+    }
+
+    if app.comms.show_selector {
+        comms_selector::render(f, app, area);
     }
 
     if app.mode == crate::app::Mode::BulkRename {
@@ -259,6 +264,10 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
 
     if app.show_theme_picker {
         theme_picker::render(f, app, area);
+    }
+
+    if app.comms.show_selector {
+        comms_selector::render(f, app, area);
     }
 
     if app.mode == crate::app::Mode::BulkRename {

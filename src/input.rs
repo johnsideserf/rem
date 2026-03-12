@@ -26,6 +26,12 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
+    // Comms selector intercepts all input when open (#105)
+    if app.comms.show_selector {
+        handle_comms_selector(app, key);
+        return;
+    }
+
     match &app.mode {
         Mode::Normal => handle_normal(app, key),
         Mode::FuzzySearch => handle_fuzzy(app, key),
@@ -955,6 +961,33 @@ fn handle_theme_picker(app: &mut App, key: KeyEvent) {
     }
 }
 
+fn handle_comms_selector(app: &mut App, key: KeyEvent) {
+    match (key.modifiers, key.code) {
+        (_, KeyCode::Esc) | (_, KeyCode::Char('q')) => {
+            app.comms.show_selector = false;
+        }
+        (KeyModifiers::NONE, KeyCode::Char('j')) | (_, KeyCode::Down) => {
+            let count = crate::comms::Channel::ALL_CHANNELS.len();
+            app.comms.selector_cursor = (app.comms.selector_cursor + 1) % count;
+        }
+        (KeyModifiers::NONE, KeyCode::Char('k')) | (_, KeyCode::Up) => {
+            let count = crate::comms::Channel::ALL_CHANNELS.len();
+            app.comms.selector_cursor = if app.comms.selector_cursor == 0 {
+                count - 1
+            } else {
+                app.comms.selector_cursor - 1
+            };
+        }
+        (_, KeyCode::Enter) => {
+            let channel = crate::comms::Channel::ALL_CHANNELS[app.comms.selector_cursor];
+            app.comms.set_channel(channel);
+            crate::config::save_comms_channel(channel);
+            app.comms.show_selector = false;
+        }
+        _ => {}
+    }
+}
+
 fn handle_rsearch(app: &mut App, key: KeyEvent) {
     match (key.modifiers, key.code) {
         (_, KeyCode::Esc) => {
@@ -1345,7 +1378,7 @@ fn handle_command(app: &mut App, key: KeyEvent) {
                 } else {
                     // Command name completion
                     let commands = [
-                        "q", "quit", "cd", "set", "sort", "theme", "symbols", "close", "git", "diff", "help",
+                        "q", "quit", "cd", "set", "sort", "theme", "symbols", "comms", "close", "git", "diff", "help",
                         "rm", "cp", "mv",
                         "|", "|clear", ">",
                     ];
@@ -1913,8 +1946,22 @@ fn execute_command(app: &mut App, cmd: &str) {
                 app.error = Some(("USAGE: diff <file1> <file2>".to_string(), Instant::now()));
             }
         }
+        Some("comms") => {
+            match parts.get(1).map(|s| s.trim()) {
+                Some(ch) => {
+                    let channel = crate::comms::Channel::from_config(ch);
+                    app.comms.set_channel(channel);
+                    crate::config::save_comms_channel(channel);
+                    app.error = Some((format!("COMMS: {}", channel.label()), Instant::now()));
+                }
+                None => {
+                    app.comms.show_selector = true;
+                    app.comms.selector_cursor = 0;
+                }
+            }
+        }
         Some("help") => {
-            app.error = Some(("COMMANDS: q cd set sort theme symbols shell tag untag rm cp mv |<cmd> >file close git diff help".to_string(), Instant::now()));
+            app.error = Some(("COMMANDS: q cd set sort theme symbols comms shell tag untag rm cp mv |<cmd> >file close git diff help".to_string(), Instant::now()));
         }
         _ => {
             app.error = Some(("UNKNOWN COMMAND \u{2014} TYPE :help".to_string(), Instant::now()));

@@ -80,6 +80,11 @@ fn main() -> io::Result<()> {
     app.screensaver_enabled = cfg.screensaver_enabled;
     app.screensaver_timeout = cfg.screensaver_timeout;
     app.distress_timeout = cfg.distress_timeout;
+    app.comms.active_channel = cfg.comms_channel;
+    app.comms.feeds = cfg.comms_feeds;
+    app.comms.custom_messages = cfg.comms_custom_messages;
+    app.comms.refresh_interval_mins = cfg.comms_refresh_interval;
+    app.comms.rss_items = crate::comms::load_comms_cache();
     app.load_entries(); // re-sort with configured sort mode
     app.init_watcher();
 

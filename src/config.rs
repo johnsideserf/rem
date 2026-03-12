@@ -17,6 +17,23 @@ struct ConfigFile {
     ticker: TickerConfig,
     #[serde(default)]
     screensaver: ScreensaverConfig,
+    #[serde(default)]
+    comms: CommsConfig,
+}
+
+#[derive(Deserialize, Default)]
+struct CommsConfig {
+    channel: Option<String>,
+    #[serde(default)]
+    feeds: Vec<CommsFeedEntry>,
+    messages: Option<Vec<String>>,
+    refresh_interval: Option<u32>,
+}
+
+#[derive(Deserialize)]
+struct CommsFeedEntry {
+    name: String,
+    url: String,
 }
 
 #[derive(Deserialize, Default)]
@@ -64,6 +81,10 @@ pub struct Config {
     pub screensaver_enabled: bool,
     pub screensaver_timeout: u64,
     pub distress_timeout: u64,
+    pub comms_channel: crate::comms::Channel,
+    pub comms_feeds: Vec<crate::comms::FeedConfig>,
+    pub comms_custom_messages: Vec<String>,
+    pub comms_refresh_interval: u32,
 }
 
 impl Default for Config {
@@ -84,6 +105,10 @@ impl Default for Config {
             screensaver_enabled: true,
             screensaver_timeout: 45,
             distress_timeout: 300,
+            comms_channel: crate::comms::Channel::All,
+            comms_feeds: Vec::new(),
+            comms_custom_messages: Vec::new(),
+            comms_refresh_interval: 30,
         }
     }
 }
@@ -191,6 +216,27 @@ pub fn save_glitch(enabled: bool) {
     let _ = std::fs::write(&path, doc.to_string());
 }
 
+/// Save the comms channel to config.toml, preserving other settings.
+pub fn save_comms_channel(channel: crate::comms::Channel) {
+    let Some(path) = config_path() else { return };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
+    let mut doc: toml::Table = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or_default();
+
+    let comms = doc.entry("comms")
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+    if let toml::Value::Table(t) = comms {
+        t.insert("channel".to_string(), toml::Value::String(channel.config_name().to_string()));
+    }
+
+    let _ = std::fs::write(&path, doc.to_string());
+}
+
 impl Config {
     /// Load config from file, then apply CLI overrides.
     pub fn load(args: &[String]) -> Self {
@@ -269,6 +315,23 @@ impl Config {
                     }
                     if let Some(v) = file.screensaver.distress_timeout {
                         cfg.distress_timeout = v;
+                    }
+                    // Comms config (#105)
+                    if let Some(ch) = &file.comms.channel {
+                        cfg.comms_channel = crate::comms::Channel::from_config(ch);
+                    }
+                    if !file.comms.feeds.is_empty() {
+                        cfg.comms_feeds = file.comms.feeds.iter().map(|f| {
+                            crate::comms::FeedConfig { name: f.name.clone(), url: f.url.clone() }
+                        }).collect();
+                    }
+                    if let Some(msgs) = file.comms.messages {
+                        if !msgs.is_empty() {
+                            cfg.comms_custom_messages = msgs;
+                        }
+                    }
+                    if let Some(v) = file.comms.refresh_interval {
+                        cfg.comms_refresh_interval = v;
                     }
                 }
             }
