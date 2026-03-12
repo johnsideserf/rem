@@ -122,6 +122,15 @@ pub fn apply_session(app: &mut App, session: Session) {
     app.show_hidden = session.show_hidden;
     app.show_telemetry = session.show_telemetry;
 
+    // Initialize sysmon if telemetry was active in the saved session
+    if app.show_telemetry && app.sysmon.is_none() {
+        app.sysmon = Some(crate::sysmon::SysMon::new());
+        app.telemetry_throbber = Some(crate::throbber::Throbber::new(
+            crate::throbber::ThrobberKind::Processing,
+            app.palette.variant,
+        ));
+    }
+
     // Reload entries with restored state
     app.load_entries();
 }

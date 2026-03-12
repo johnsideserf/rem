@@ -15,10 +15,9 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
     // Dismiss comms on input (#74)
     app.comms.dismiss();
 
-    // Dismiss error on any key
+    // Dismiss error/feedback on any key (but don't consume the keypress)
     if app.error.is_some() {
         app.error = None;
-        return;
     }
 
     // Theme picker intercepts all input when open
