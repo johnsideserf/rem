@@ -745,6 +745,8 @@ pub struct App {
     pub frecency: crate::frecency::FrecencyStore,
     // File diff view (#85)
     pub file_diff: Option<crate::diff::DiffView>,
+    // Preview minimap (#86)
+    pub show_minimap: bool,
 }
 
 impl App {
@@ -850,6 +852,7 @@ impl App {
             git_file_statuses: std::collections::HashMap::new(),
             frecency: crate::frecency::FrecencyStore::new(),
             file_diff: None,
+            show_minimap: false,
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);
