@@ -1,6 +1,7 @@
 pub mod boot;
 mod header;
 mod breadcrumb;
+mod diffview;
 mod editor;
 mod list;
 mod sidebar;
@@ -87,6 +88,8 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
             ed.viewport_cols = (outer[2].width as usize).saturating_sub(gutter_w);
         }
         editor::render(f, app, outer[2]);
+    } else if app.mode == crate::app::Mode::FileDiff {
+        diffview::render(f, app, outer[2]);
     } else if app.mode == crate::app::Mode::RecursiveSearch {
         list::render_rsearch(f, app, outer[2]);
     } else {
@@ -193,7 +196,7 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     breadcrumb::render_pane(f, app, 0, breadcrumb_halves[0], active == 0);
     breadcrumb::render_pane(f, app, 1, breadcrumb_halves[1], active == 1);
 
-    // Editor takes over full body in dual-pane mode too
+    // Editor / FileDiff takes over full body in dual-pane mode too
     if app.mode == crate::app::Mode::Edit {
         if let Some(ed) = &mut app.editor {
             let gutter_w = format!("{}", ed.lines.len()).len().max(3) + 2;
@@ -201,6 +204,8 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
             ed.viewport_cols = (outer[2].width as usize).saturating_sub(gutter_w);
         }
         editor::render(f, app, outer[2]);
+    } else if app.mode == crate::app::Mode::FileDiff {
+        diffview::render(f, app, outer[2]);
     } else {
 
     // Split body into two halves

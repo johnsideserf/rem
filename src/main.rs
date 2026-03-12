@@ -2,6 +2,7 @@ mod app;
 mod archive;
 mod comms;
 mod config;
+mod diff;
 mod favorites;
 mod frecency;
 mod gitstatus;

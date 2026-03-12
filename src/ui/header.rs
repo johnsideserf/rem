@@ -45,6 +45,7 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         Mode::OpsLog => ("LOG", pal.text_mid),
         Mode::Command => ("COMMAND", pal.text_mid),
         Mode::TagInput => ("TAG", pal.text_mid),
+        Mode::FileDiff => ("DIFF", pal.text_hot),
     };
 
     // Left side: status info
