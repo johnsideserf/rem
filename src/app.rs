@@ -416,6 +416,7 @@ pub struct ArchiveContext {
     pub all_entries: Vec<ArchiveEntry>,
 }
 
+#[derive(Clone)]
 pub struct FsEntry {
     pub name: String,
     pub path: PathBuf,
@@ -518,6 +519,7 @@ pub struct LayoutAreas {
     pub breadcrumb_segments: Vec<(u16, u16, std::path::PathBuf)>,
 }
 
+#[derive(Clone)]
 pub struct PaneState {
     pub current_dir: PathBuf,
     pub entries: Vec<FsEntry>,
@@ -529,6 +531,15 @@ pub struct PaneState {
     pub nav_history: Vec<PathBuf>,
     pub nav_history_cursor: usize,
     pub viewport_height: usize,
+}
+
+/// Tab workspace state (#81).
+#[derive(Clone)]
+pub struct TabState {
+    pub panes: [PaneState; 2],
+    pub active_pane: usize,
+    pub dual_pane: bool,
+    pub label: String,
 }
 
 impl PaneState {
@@ -724,6 +735,9 @@ pub struct App {
     pub watcher_rx: Option<std::sync::mpsc::Receiver<()>>,
     pub manifest_flash: Option<Instant>,
     pub dir_watcher: Option<crate::watcher::DirWatcher>,
+    // Multi-tab workspaces (#81)
+    pub tabs: Vec<TabState>,
+    pub active_tab: usize,
 }
 
 impl App {
@@ -824,6 +838,8 @@ impl App {
             watcher_rx: None,
             manifest_flash: None,
             dir_watcher: None,
+            tabs: Vec::new(),
+            active_tab: 0,
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);
@@ -846,6 +862,93 @@ impl App {
         let (watcher, rx) = crate::watcher::create_watcher(dir);
         self.dir_watcher = Some(watcher);
         self.watcher_rx = Some(rx);
+    }
+
+    /// Save current state to a TabState (#81).
+    fn save_to_tab(&self) -> TabState {
+        TabState {
+            panes: [self.panes[0].clone(), self.panes[1].clone()],
+            active_pane: self.active_pane,
+            dual_pane: self.dual_pane,
+            label: self.pane().current_dir.file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "/".to_string()),
+        }
+    }
+
+    /// Load state from a TabState (#81).
+    fn load_from_tab(&mut self, tab: &TabState) {
+        self.panes = [tab.panes[0].clone(), tab.panes[1].clone()];
+        self.active_pane = tab.active_pane;
+        self.dual_pane = tab.dual_pane;
+    }
+
+    /// Create a new tab from the current directory (#81).
+    pub fn new_tab(&mut self) {
+        // Save current state
+        let current = self.save_to_tab();
+        if self.active_tab < self.tabs.len() {
+            self.tabs[self.active_tab] = current;
+        } else {
+            self.tabs.push(current);
+        }
+        // Create new tab from current directory
+        let dir = self.pane().current_dir.clone();
+        let new_pane = PaneState::new(dir);
+        self.panes = [new_pane.clone(), new_pane];
+        self.active_pane = 0;
+        self.dual_pane = false;
+        self.tabs.push(self.save_to_tab());
+        self.active_tab = self.tabs.len() - 1;
+        self.load_entries();
+    }
+
+    /// Close the current tab (#81).
+    pub fn close_tab(&mut self) {
+        if self.tabs.len() <= 1 {
+            // Only one tab (or no saved tabs) -- don't close
+            return;
+        }
+        if self.active_tab < self.tabs.len() {
+            self.tabs.remove(self.active_tab);
+        }
+        if self.active_tab >= self.tabs.len() {
+            self.active_tab = self.tabs.len().saturating_sub(1);
+        }
+        if let Some(tab) = self.tabs.get(self.active_tab) {
+            let tab = tab.clone();
+            self.load_from_tab(&tab);
+        }
+    }
+
+    /// Switch to next or previous tab (#81).
+    pub fn switch_tab(&mut self, direction: i32) {
+        if self.tabs.is_empty() {
+            return;
+        }
+        // Save current
+        let current = self.save_to_tab();
+        if self.active_tab < self.tabs.len() {
+            self.tabs[self.active_tab] = current;
+        }
+        // Switch
+        let len = self.tabs.len();
+        if direction > 0 {
+            self.active_tab = (self.active_tab + 1) % len;
+        } else if self.active_tab == 0 {
+            self.active_tab = len - 1;
+        } else {
+            self.active_tab -= 1;
+        }
+        if let Some(tab) = self.tabs.get(self.active_tab) {
+            let tab = tab.clone();
+            self.load_from_tab(&tab);
+        }
+    }
+
+    /// Number of tabs (at least 1) (#81).
+    pub fn tab_count(&self) -> usize {
+        self.tabs.len().max(1)
     }
 
     pub fn tick(&mut self) {

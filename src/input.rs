@@ -203,6 +203,16 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
                 }
             }
         }
+        // Multi-tab workspaces (#81)
+        (KeyModifiers::CONTROL, KeyCode::Char('n')) => {
+            app.new_tab();
+        }
+        (KeyModifiers::ALT, KeyCode::Left) => {
+            app.switch_tab(-1);
+        }
+        (KeyModifiers::ALT, KeyCode::Right) => {
+            app.switch_tab(1);
+        }
         // File operations
         (KeyModifiers::NONE, KeyCode::Char('y')) => {
             app.mode = Mode::WaitingForYank;
@@ -1303,7 +1313,7 @@ fn handle_command(app: &mut App, key: KeyEvent) {
                 } else {
                     // Command name completion
                     let commands = [
-                        "q", "quit", "cd", "set", "sort", "theme", "symbols", "help",
+                        "q", "quit", "cd", "set", "sort", "theme", "symbols", "close", "help",
                         "rm", "cp", "mv",
                         "|", "|clear", ">",
                     ];
@@ -1755,8 +1765,11 @@ fn execute_command(app: &mut App, cmd: &str) {
                 }
             }
         }
+        Some("close") => {
+            app.close_tab();
+        }
         Some("help") => {
-            app.error = Some(("COMMANDS: q cd set sort theme symbols shell tag untag rm cp mv |<cmd> >file help".to_string(), Instant::now()));
+            app.error = Some(("COMMANDS: q cd set sort theme symbols shell tag untag rm cp mv |<cmd> >file close help".to_string(), Instant::now()));
         }
         _ => {
             app.error = Some(("UNKNOWN COMMAND \u{2014} TYPE :help".to_string(), Instant::now()));
