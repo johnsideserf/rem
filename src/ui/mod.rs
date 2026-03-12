@@ -574,7 +574,7 @@ fn render_distress(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     // Pulse between text_hot and text_dim
     let pulse = if (tick / 5) % 2 == 0 { pal.text_hot } else { pal.text_dim };
 
-    let sos_w = sos_art[0].len() as u16;
+    let sos_w = sos_art[0].chars().count() as u16;
     let sos_h = sos_art.len() as u16;
     let cx = area.x + (area.width.saturating_sub(sos_w)) / 2;
     let cy = area.y + (area.height.saturating_sub(sos_h + 10)) / 2;
@@ -609,7 +609,7 @@ fn render_distress(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     // DISTRESS BEACON ACTIVE label with throbber
     let throbber = app.idle_throbber.frame();
     let beacon_msg = format!("{} DISTRESS BEACON ACTIVE", throbber);
-    let beacon_w = beacon_msg.len() as u16;
+    let beacon_w = beacon_msg.chars().count() as u16;
     let beacon_x = area.x + (area.width.saturating_sub(beacon_w)) / 2;
     let beacon_y = coords_y + 2;
     if beacon_y < area.y + area.height {
