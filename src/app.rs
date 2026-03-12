@@ -718,6 +718,8 @@ pub struct App {
     pub tag_input: String,
     // Comms intercept (#74)
     pub comms: crate::comms::CommsState,
+    // Pipe to external tools (#83)
+    pub pipe_filtered: Option<Vec<String>>,
 }
 
 impl App {
@@ -814,6 +816,7 @@ impl App {
             tags: crate::tags::TagStore::new(),
             tag_input: String::new(),
             comms: crate::comms::CommsState::new(),
+            pipe_filtered: None,
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);

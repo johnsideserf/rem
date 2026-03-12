@@ -167,6 +167,7 @@ impl App {
             pane.scroll_offset = 0;
             pane.fuzzy_query.clear();
         }
+        self.pipe_filtered = None;
         self.load_entries();
         self.git_info = GitInfo::detect(&dir);
         if !self.reduce_motion {
