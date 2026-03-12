@@ -95,6 +95,9 @@ fn main() -> io::Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
+    // CRT warm-up effect (always runs — very fast)
+    let _ = ui::boot::run_warmup(&mut terminal, cfg.palette);
+
     // Boot sequence
     if cfg.boot_sequence {
         let _ = ui::boot::run_boot(&mut terminal, cfg.palette);
