@@ -13,6 +13,7 @@ mod palette;
 mod preview;
 mod symbols;
 mod sysmon;
+mod session;
 mod tags;
 mod throbber;
 mod ui;
@@ -84,6 +85,11 @@ fn main() -> io::Result<()> {
     // Load tags (#58)
     app.tags = tags::load_tags();
 
+    // Load session (#80)
+    if let Some(sess) = session::load_session() {
+        session::apply_session(&mut app, sess);
+    }
+
     // Setup terminal
     terminal::enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -112,6 +118,9 @@ fn main() -> io::Result<()> {
     } else {
         execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     }
+
+    // Save session (#80)
+    session::save_session(&app);
 
     // Save bookmarks
     marks::save_marks(&app.marks);
