@@ -327,8 +327,24 @@ fn render_network(f: &mut Frame, app: &App, area: Rect) {
         ),
     ]));
 
-    // Pad
+    // Telemetry animation in remaining space
     let height = area.height as usize;
+    let anim_width = (area.width as usize).saturating_sub(3); // border + padding
+    let remaining = height.saturating_sub(lines.len());
+    if remaining > 0 && anim_width > 4 {
+        lines.push(Line::from(Span::styled("", Style::default().bg(pal.bg))));
+        let anim_rows = remaining.saturating_sub(1);
+        let tick = app.glitch_tick as usize;
+        let anim_lines = render_telemetry_animation(pal, tick, anim_width, anim_rows);
+        for (text, color) in anim_lines {
+            lines.push(Line::from(Span::styled(
+                format!(" {}", text),
+                Style::default().fg(color).bg(pal.bg),
+            )));
+        }
+    }
+
+    // Pad any leftover
     while lines.len() < height {
         lines.push(Line::from(Span::styled("", Style::default().bg(pal.bg))));
     }
@@ -341,4 +357,182 @@ fn render_network(f: &mut Frame, app: &App, area: Rect) {
 
     let paragraph = Paragraph::new(lines).block(block);
     f.render_widget(paragraph, area);
+}
+
+/// Generate per-palette braille animation for the network panel.
+/// Returns Vec<(String, Color)> — one entry per row.
+fn render_telemetry_animation(
+    pal: crate::palette::Palette,
+    tick: usize,
+    width: usize,
+    rows: usize,
+) -> Vec<(String, ratatui::style::Color)> {
+    if rows == 0 || width == 0 {
+        return vec![];
+    }
+    match pal.variant {
+        crate::throbber::PaletteVariant::Green => render_radar_sweep(pal, tick, width, rows),
+        crate::throbber::PaletteVariant::Amber => render_seismograph(pal, tick, width, rows),
+        crate::throbber::PaletteVariant::Cyan => render_data_waterfall(pal, tick, width, rows),
+    }
+}
+
+/// Green: horizontal radar sweep with phosphor echo decay.
+/// A vertical beam scans left-to-right, leaving fading blips.
+fn render_radar_sweep(
+    pal: crate::palette::Palette,
+    tick: usize,
+    width: usize,
+    rows: usize,
+) -> Vec<(String, ratatui::style::Color)> {
+    // Braille cell = 2 wide × 4 tall dots
+    // We build a dot grid of (rows*4) tall × (width*2) wide, then encode to braille
+    let dot_h = rows * 4;
+    let dot_w = width * 2;
+    let mut grid = vec![vec![0u8; dot_w]; dot_h]; // 0=off, 1=dim, 2=mid, 3=bright
+
+    // Sweep beam position (column in dot-space)
+    let sweep_period = dot_w + 8;
+    let beam_x = tick % sweep_period;
+
+    // Draw beam as a vertical line
+    for y in 0..dot_h {
+        if beam_x < dot_w {
+            grid[y][beam_x] = 3;
+            // Slight spread
+            if beam_x + 1 < dot_w { grid[y][beam_x + 1] = 2; }
+        }
+    }
+
+    // Echo blips — deterministic from LCG seeded by position
+    for i in 0..((width * rows) / 3).max(4) {
+        let seed = i.wrapping_mul(7919).wrapping_add(31);
+        let bx = seed % dot_w;
+        let by = (seed.wrapping_mul(13)) % dot_h;
+        // Only show blip if the beam has passed it recently
+        if beam_x < dot_w {
+            let dist = if beam_x >= bx { beam_x - bx } else { sweep_period - bx + beam_x };
+            if dist < 6 {
+                grid[by][bx] = if dist < 2 { 3 } else if dist < 4 { 2 } else { 1 };
+            }
+        }
+    }
+
+    encode_braille_grid(&grid, rows, width, pal.text_hot)
+}
+
+/// Amber: scrolling seismograph waveform.
+/// Height values scroll left with new readings on the right.
+fn render_seismograph(
+    pal: crate::palette::Palette,
+    tick: usize,
+    width: usize,
+    rows: usize,
+) -> Vec<(String, ratatui::style::Color)> {
+    let dot_h = rows * 4;
+    let dot_w = width * 2;
+    let mut grid = vec![vec![0u8; dot_w]; dot_h];
+    let midline = dot_h / 2;
+
+    for col in 0..dot_w {
+        // Generate height using layered sine waves for organic feel
+        let t = (col + tick) as f64;
+        let v1 = (t * 0.15).sin() * 0.4;
+        let v2 = (t * 0.37).sin() * 0.25;
+        let v3 = (t * 0.73).sin() * 0.15;
+        // Occasional spike from LCG hash
+        let hash = ((col + tick).wrapping_mul(2654435761)) % 100;
+        let spike = if hash < 3 { 0.3 } else { 0.0 };
+        let displacement = v1 + v2 + v3 + spike;
+        let y_offset = (displacement * midline as f64) as i32;
+        let y = (midline as i32 + y_offset).clamp(0, dot_h as i32 - 1) as usize;
+
+        // Draw the waveform point and a faint trace below
+        grid[y][col] = 3;
+        // Vertical fill toward midline for body
+        let (from, to) = if y < midline { (y, midline) } else { (midline, y) };
+        for fy in from..=to {
+            if grid[fy][col] < 1 { grid[fy][col] = 1; }
+        }
+    }
+
+    encode_braille_grid(&grid, rows, width, pal.text_hot)
+}
+
+/// Cyan: data throughput waterfall / spectrogram.
+/// Vertical density bars that scroll, like a network traffic heatmap.
+fn render_data_waterfall(
+    pal: crate::palette::Palette,
+    tick: usize,
+    width: usize,
+    rows: usize,
+) -> Vec<(String, ratatui::style::Color)> {
+    let dot_h = rows * 4;
+    let dot_w = width * 2;
+    let mut grid = vec![vec![0u8; dot_w]; dot_h];
+
+    for col in 0..dot_w {
+        // Each column has a density value derived from hash + tick
+        let t = col.wrapping_add(tick.wrapping_mul(3));
+        let hash = t.wrapping_mul(2654435761) >> 16;
+        let density = (hash % 100) as f64 / 100.0;
+
+        // Primary wave pattern
+        let wave = ((col + tick) as f64 * 0.2).sin() * 0.5 + 0.5;
+        let combined = (density * 0.4 + wave * 0.6).min(1.0);
+
+        // Fill dots from bottom up based on combined intensity
+        let fill_height = (combined * dot_h as f64) as usize;
+        for y in 0..fill_height {
+            let row = dot_h - 1 - y;
+            let brightness = if y < fill_height / 3 { 1 }
+                else if y < fill_height * 2 / 3 { 2 }
+                else { 3 };
+            grid[row][col] = brightness;
+        }
+    }
+
+    encode_braille_grid(&grid, rows, width, pal.text_hot)
+}
+
+/// Encode a dot grid into braille characters.
+/// Grid values: 0=off, 1+=on. Each braille cell is 2 wide × 4 tall.
+/// Returns one (String, Color) per text row.
+fn encode_braille_grid(
+    grid: &[Vec<u8>],
+    rows: usize,
+    width: usize,
+    color: ratatui::style::Color,
+) -> Vec<(String, ratatui::style::Color)> {
+    let dot_h = grid.len();
+    let dot_w = if dot_h > 0 { grid[0].len() } else { 0 };
+    let mut result = Vec::with_capacity(rows);
+
+    for row in 0..rows {
+        let mut s = String::with_capacity(width);
+        for col in 0..width {
+            let dx = col * 2;
+            let dy = row * 4;
+            let mut cp: u32 = 0x2800;
+
+            // Braille dot mapping:
+            // (0,0)=1  (1,0)=8
+            // (0,1)=2  (1,1)=16
+            // (0,2)=4  (1,2)=32
+            // (0,3)=64 (1,3)=128
+            for &(ox, oy, bit) in &[
+                (0,0,1), (0,1,2), (0,2,4), (0,3,64),
+                (1,0,8), (1,1,16), (1,2,32), (1,3,128),
+            ] {
+                let gx = dx + ox;
+                let gy = dy + oy;
+                if gx < dot_w && gy < dot_h && grid[gy][gx] > 0 {
+                    cp |= bit;
+                }
+            }
+            s.push(char::from_u32(cp).unwrap_or(' '));
+        }
+        result.push((s, color));
+    }
+    result
 }
