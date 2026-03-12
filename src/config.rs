@@ -13,6 +13,14 @@ struct ConfigFile {
     appearance: AppearanceConfig,
     #[serde(default)]
     behavior: BehaviorConfig,
+    #[serde(default)]
+    ticker: TickerConfig,
+}
+
+#[derive(Deserialize, Default)]
+struct TickerConfig {
+    enabled: Option<bool>,
+    messages: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Default)]
@@ -42,6 +50,8 @@ pub struct Config {
     pub glitch_enabled: bool,
     pub mouse_enabled: bool,
     pub warnings: Vec<String>,
+    pub ticker_enabled: bool,
+    pub ticker_messages: Vec<String>,
 }
 
 impl Default for Config {
@@ -57,6 +67,8 @@ impl Default for Config {
             glitch_enabled: true,
             mouse_enabled: true,
             warnings: Vec::new(),
+            ticker_enabled: true,
+            ticker_messages: Vec::new(), // empty = use app defaults
         }
     }
 }
@@ -223,6 +235,15 @@ impl Config {
                                 SortMode::NameAsc
                             }
                         };
+                    }
+                    // Ticker config (#88)
+                    if let Some(v) = file.ticker.enabled {
+                        cfg.ticker_enabled = v;
+                    }
+                    if let Some(msgs) = file.ticker.messages {
+                        if !msgs.is_empty() {
+                            cfg.ticker_messages = msgs;
+                        }
                     }
                 }
             }
