@@ -657,6 +657,22 @@
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">IMAGE PREVIEW</span><span class="feature-desc">Braille-art rendering of PNG, JPG, GIF, BMP, WebP images in preview pane</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">TREE VIEW</span><span class="feature-desc">T to toggle hierarchical directory tree with lazy-loaded expand/collapse</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">DUAL-PANE DIFF</span><span class="feature-desc">Ctrl+X to highlight files unique to each pane vs common entries</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">COMMS INTERCEPT</span><span class="feature-desc">Ambient Weyland-Yutani lore messages surface during idle (LV-426 beacons, corporate directives, crew manifests)</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">DISTRESS SIGNAL</span><span class="feature-desc">Pulsing braille SOS distress beacon with fake coordinates after extended idle</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">CRT WARM-UP</span><span class="feature-desc">Phosphor ramp-up animation before boot sequence simulating CRT cathode heating</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">I/O WAVEFORM</span><span class="feature-desc">Real-time braille oscilloscope in telemetry panel driven by CPU load and network throughput</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">TELEMETRY ANIMATIONS</span><span class="feature-desc">Per-theme braille art: radar sweep (green), seismograph (amber), Conway's Game of Life (cyan)</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">HEADER TICKER</span><span class="feature-desc">Scrolling Weyland-Yutani corporate messages in header bar, configurable via config.toml</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">ANIMATED BADGES</span><span class="feature-desc">Executables, config files, and encrypted assets pulse with per-palette badge animations</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">MULTI-TAB</span><span class="feature-desc">Ctrl+N to open new tab, Alt+Left/Right to switch, :close to dismiss</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">SESSION PERSISTENCE</span><span class="feature-desc">Workspace state saved automatically between sessions (directories, panes, sort, layout)</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">FILESYSTEM WATCHER</span><span class="feature-desc">Live directory reloading when external processes modify the current directory</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">GIT STAGING</span><span class="feature-desc">Ctrl+G to stage/unstage files, :git commit, status badges [+]/[M]/[?] in file list</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">FILE COMPARISON</span><span class="feature-desc">:diff for side-by-side file diff with color-coded additions and removals</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">PREVIEW MINIMAP</span><span class="feature-desc">Ctrl+M to toggle braille minimap in preview pane with viewport indicator</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">BATCH GLOB OPS</span><span class="feature-desc">:rm, :cp, :mv with glob patterns for bulk file operations</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">PIPE EXTERNAL</span><span class="feature-desc">| to filter file list through external commands, &gt; to export to file</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">FRECENCY BOOKMARKS</span><span class="feature-desc">Frequently visited directories ranked by visit recency in sidebar</span></li>
       </ul>
     </section>
 
@@ -678,7 +694,7 @@
             <span class="profile-card-name">PHOSPHOR GREEN</span>
             <span class="profile-card-code">WY-CRT-01</span>
           </div>
-          <div class="profile-card-desc">Ship terminals (Nostromo, Sulaco). Scan line shimmer, phosphor persistence trail. Radar scanning throbber, signal ping idle animation. Braille sparklines for telemetry.</div>
+          <div class="profile-card-desc">Ship terminals (Nostromo, Sulaco). Scan line shimmer, phosphor persistence trail. Radar scanning throbber, signal ping idle animation. Braille sparklines and radar sweep telemetry animation.</div>
           <img src="screenshots/green.png" alt="Phosphor Green display profile" loading="lazy">
         </div>
         <div class="profile-card">
@@ -686,7 +702,7 @@
             <span class="profile-card-name">AMBER</span>
             <span class="profile-card-code">WY-CRT-02</span>
           </div>
-          <div class="profile-card-desc">Colony terminals (Hadley's Hope). Signal degradation, character corruption, glitch lines. Seismograph scanning throbber, warning strobe idle animation. Glitchy dropout sparklines.</div>
+          <div class="profile-card-desc">Colony terminals (Hadley's Hope). Signal degradation, character corruption, glitch lines. Seismograph scanning throbber, warning strobe idle animation. Glitchy dropout sparklines and seismograph telemetry animation.</div>
           <img src="screenshots/amber.png" alt="Amber display profile" loading="lazy">
         </div>
         <div class="profile-card">
@@ -694,7 +710,7 @@
             <span class="profile-card-name">CORPORATE CYAN</span>
             <span class="profile-card-code">WY-CRT-03</span>
           </div>
-          <div class="profile-card-desc">Executive consoles, MedPods. Rare thermal flicker, cursor bloom. Diamond scanning throbber, access pulse idle animation. Clean block sparklines.</div>
+          <div class="profile-card-desc">Executive consoles, MedPods. Rare thermal flicker, cursor bloom. Diamond scanning throbber, access pulse idle animation. Clean block sparklines and Conway's Game of Life telemetry animation.</div>
           <img src="screenshots/cyan-w-theme-picker.png" alt="Corporate Cyan display profile with theme picker" loading="lazy">
         </div>
       </div>
@@ -808,11 +824,23 @@
         <tr><td class="cmd-key">u</td><td class="cmd-desc">Clear all marks</td></tr>
       </table>
 
+      <div class="cmd-group-title">GIT STAGING</div>
+      <table class="cmd-table">
+        <tr><td class="cmd-key">Ctrl+G</td><td class="cmd-desc">Toggle stage/unstage current file</td></tr>
+      </table>
+
+      <div class="cmd-group-title">TABS</div>
+      <table class="cmd-table">
+        <tr><td class="cmd-key">Ctrl+N</td><td class="cmd-desc">Open new tab</td></tr>
+        <tr><td class="cmd-key">Alt+Left / Alt+Right</td><td class="cmd-desc">Switch to previous / next tab</td></tr>
+      </table>
+
       <div class="cmd-group-title">DISPLAY &amp; PANELS</div>
       <table class="cmd-table">
         <tr><td class="cmd-key">Ctrl+W</td><td class="cmd-desc">Toggle dual-pane mode</td></tr>
         <tr><td class="cmd-key">Tab</td><td class="cmd-desc">Switch active pane / cycle right panel</td></tr>
         <tr><td class="cmd-key">Ctrl+J / Ctrl+K</td><td class="cmd-desc">Scroll preview pane down / up</td></tr>
+        <tr><td class="cmd-key">Ctrl+M</td><td class="cmd-desc">Toggle preview minimap</td></tr>
         <tr><td class="cmd-key">[</td><td class="cmd-desc">Contract sidebar</td></tr>
         <tr><td class="cmd-key">]</td><td class="cmd-desc">Expand sidebar</td></tr>
         <tr><td class="cmd-key">t</td><td class="cmd-desc">Open display profile / symbol set selector</td></tr>
@@ -833,6 +861,19 @@
         <tr><td class="cmd-key">:sort name|size|date</td><td class="cmd-desc">Set sort mode</td></tr>
         <tr><td class="cmd-key">:theme green|amber|cyan</td><td class="cmd-desc">Switch display profile</td></tr>
         <tr><td class="cmd-key">:symbols &lt;variant&gt;</td><td class="cmd-desc">Switch symbol set</td></tr>
+        <tr><td class="cmd-key">:close</td><td class="cmd-desc">Close current tab</td></tr>
+        <tr><td class="cmd-key">:set minimap / nominimap</td><td class="cmd-desc">Toggle preview minimap</td></tr>
+        <tr><td class="cmd-key">:rm &lt;glob&gt;</td><td class="cmd-desc">Remove files matching glob pattern</td></tr>
+        <tr><td class="cmd-key">:cp &lt;glob&gt; &lt;dest&gt;</td><td class="cmd-desc">Copy files matching glob pattern</td></tr>
+        <tr><td class="cmd-key">:mv &lt;glob&gt; &lt;dest&gt;</td><td class="cmd-desc">Move files matching glob pattern</td></tr>
+        <tr><td class="cmd-key">:diff &lt;f1&gt; &lt;f2&gt;</td><td class="cmd-desc">Side-by-side file comparison</td></tr>
+        <tr><td class="cmd-key">:git status</td><td class="cmd-desc">Show git status</td></tr>
+        <tr><td class="cmd-key">:git add</td><td class="cmd-desc">Stage current file</td></tr>
+        <tr><td class="cmd-key">:git reset</td><td class="cmd-desc">Unstage current file</td></tr>
+        <tr><td class="cmd-key">:git commit &lt;msg&gt;</td><td class="cmd-desc">Commit staged changes</td></tr>
+        <tr><td class="cmd-key">:| &lt;cmd&gt;</td><td class="cmd-desc">Filter file list through external command</td></tr>
+        <tr><td class="cmd-key">:| clear</td><td class="cmd-desc">Clear pipe filter</td></tr>
+        <tr><td class="cmd-key">:&gt; &lt;file&gt;</td><td class="cmd-desc">Write file list or preview to file</td></tr>
         <tr><td class="cmd-key">:help</td><td class="cmd-desc">Show available commands</td></tr>
       </table>
 
@@ -862,7 +903,12 @@
 <span class="config-key">sort_mode</span> = <span class="config-val">"name_asc"</span>       <span class="config-comment"># name_asc | name_desc | size_asc | size_desc | date_newest | date_oldest</span>
 <span class="config-key">glitch_enabled</span> = <span class="config-val">true</span>        <span class="config-comment"># CRT glitch effects per palette</span>
 <span class="config-key">reduce_motion</span> = <span class="config-val">false</span>        <span class="config-comment"># disable animations</span>
-<span class="config-key">mouse_enabled</span> = <span class="config-val">true</span>         <span class="config-comment"># mouse scroll/click support</span></div>
+<span class="config-key">mouse_enabled</span> = <span class="config-val">true</span>         <span class="config-comment"># mouse scroll/click support</span>
+
+<span class="config-comment"># Header ticker</span>
+<span class="config-key">[ticker]</span>
+<span class="config-key">enabled</span> = <span class="config-val">true</span>                 <span class="config-comment"># scrolling header messages</span>
+<span class="config-key">messages</span> = <span class="config-val">["BUILDING BETTER WORLDS", "COMPANY PROPERTY"]</span></div>
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════
@@ -911,7 +957,7 @@
   <footer>
     <div class="rule">&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;</div>
     <div class="corp-line">Weyland-Yutani Corporation. Building Better Worlds.</div>
-    <div class="legal">This software is provided under the MIT license.<br>The Company assumes no liability for data loss, xenomorph encounters,<br>or crew expenditure resulting from use of this terminal.</div>
+    <div class="legal">This software is provided under the AGPL-3.0 license.<br>The Company assumes no liability for data loss, xenomorph encounters,<br>or crew expenditure resulting from use of this terminal.</div>
     <div class="terminated">SESSION TERMINATED <span class="cursor">&#x258b;</span></div>
   </footer>
 

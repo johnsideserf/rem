@@ -68,6 +68,22 @@ A corporate-grade terminal file navigator built in Rust with [ratatui](https://r
 - **Lock screen** -- `L` to activate per-palette animated screensaver with braille art
 - **Boot sequence** -- per-palette corporate authentication splash with animated WY mark
 - **Per-palette throbbers** -- 5 throbber types (DataStream, Processing, Heartbeat, Scanning, Idle) with unique frame sets per display profile
+- **COMMS INTERCEPT** -- ambient Weyland-Yutani lore messages surface during idle periods (LV-426 beacons, corporate directives, crew manifests)
+- **Distress signal screensaver** -- after extended idle, a pulsing braille SOS distress beacon with fake coordinates replaces the standard screensaver
+- **CRT warm-up** -- phosphor ramp-up animation before boot sequence, simulating CRT cathode heating
+- **I/O waveform** -- real-time braille oscilloscope in telemetry panel driven by CPU load and network throughput
+- **Per-theme telemetry animations** -- radar sweep (green), seismograph (amber), Conway's Game of Life cellular automaton (cyan) alongside network telemetry
+- **Header ticker** -- scrolling Weyland-Yutani corporate messages in header bar, configurable via `config.toml`
+- **Animated file type badges** -- executables, config files, and encrypted assets pulse with per-palette badge animations
+- **Multi-tab workspaces** -- `Ctrl+N` to open new tab, `Alt+Left`/`Alt+Right` to switch, `:close` to dismiss
+- **Session persistence** -- workspace state (directories, panes, sort mode, panel layout) saved automatically between sessions
+- **Filesystem watcher** -- live directory reloading when external processes modify the current directory
+- **Git staging integration** -- `Ctrl+G` to stage/unstage files, `:git commit`, status badges `[+]`/`[M]`/`[?]` in file list
+- **File comparison** -- `:diff` for side-by-side file diff with color-coded additions and removals
+- **Preview minimap** -- `Ctrl+M` to toggle braille minimap in preview pane with viewport indicator
+- **Batch glob operations** -- `:rm`, `:cp`, `:mv` with glob patterns for bulk file operations
+- **Pipe to external tools** -- `| <cmd>` to filter file list through external commands, `> <file>` to export
+- **Frecency smart bookmarks** -- frequently visited directories ranked by visit recency in sidebar
 
 ### Display Profiles
 
@@ -77,7 +93,7 @@ A corporate-grade terminal file navigator built in Rust with [ratatui](https://r
 | **AMBER** | WY-CRT-02 | Colony terminals (Hadley's Hope) | Signal degradation, character corruption, glitch lines |
 | **CORPORATE CYAN** | WY-CRT-03 | Executive consoles, MedPods | Rare thermal flicker, cursor bloom |
 
-Each profile includes unique throbber animations (radar/seismograph/diamond scanning indicators, signal ping/warning strobe/access pulse idle throbbers), per-palette braille sparklines in telemetry, and themed boot sequences.
+Each profile includes unique throbber animations (radar/seismograph/diamond scanning indicators, signal ping/warning strobe/access pulse idle throbbers), per-palette braille sparklines in telemetry, themed boot sequences, and unique telemetry animations (radar sweep, seismograph, Conway's Game of Life).
 
 ### Command Reference
 
@@ -132,12 +148,24 @@ Each profile includes unique throbber animations (radar/seismograph/diamond scan
 | `v` | Toggle visual targeting mode |
 | `u` | Clear all marks |
 
+#### Git Staging
+| Input | Function |
+|-------|----------|
+| `Ctrl+G` | Toggle stage/unstage current file |
+
+#### Tabs
+| Input | Function |
+|-------|----------|
+| `Ctrl+N` | Open new tab |
+| `Alt+Left` / `Alt+Right` | Switch to previous / next tab |
+
 #### Display & Panels
 | Input | Function |
 |-------|----------|
 | `Ctrl+W` | Toggle dual-pane mode |
 | `Tab` | Switch active pane / cycle right panel |
 | `Ctrl+J` / `Ctrl+K` | Scroll preview pane down / up |
+| `Ctrl+M` | Toggle preview minimap |
 | `[` | Contract sidebar |
 | `]` | Expand sidebar |
 | `t` | Open display profile / symbol set selector |
@@ -150,6 +178,30 @@ Each profile includes unique throbber animations (radar/seismograph/diamond scan
 |-------|----------|
 | `q` | Terminate session |
 | `Esc` | Abort current operation |
+
+#### MU-TH-UR Command Mode (`:`)
+| Input | Function |
+|-------|----------|
+| `:q` | Terminate session |
+| `:cd <path>` | Navigate to directory |
+| `:close` | Close current tab |
+| `:set hidden / nohidden` | Toggle hidden files |
+| `:set minimap / nominimap` | Toggle preview minimap |
+| `:sort name\|size\|date` | Set sort mode |
+| `:theme green\|amber\|cyan` | Switch display profile |
+| `:symbols <variant>` | Switch symbol set |
+| `:rm <glob>` | Remove files matching glob pattern |
+| `:cp <glob> <dest>` | Copy files matching glob pattern |
+| `:mv <glob> <dest>` | Move files matching glob pattern |
+| `:diff <file1> <file2>` | Side-by-side file comparison |
+| `:git status` | Show git status |
+| `:git add` | Stage current file |
+| `:git reset` | Unstage current file |
+| `:git commit <msg>` | Commit staged changes |
+| `:\| <cmd>` | Filter file list through external command |
+| `:\| clear` | Clear pipe filter |
+| `:> <file>` | Write file list or preview to file |
+| `:help` | Show available commands |
 
 ## Deployment
 
