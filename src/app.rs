@@ -720,6 +720,10 @@ pub struct App {
     pub comms: crate::comms::CommsState,
     // Pipe to external tools (#83)
     pub pipe_filtered: Option<Vec<String>>,
+    // Filesystem watcher (#79)
+    pub watcher_rx: Option<std::sync::mpsc::Receiver<()>>,
+    pub manifest_flash: Option<Instant>,
+    pub dir_watcher: Option<crate::watcher::DirWatcher>,
 }
 
 impl App {
@@ -817,6 +821,9 @@ impl App {
             tag_input: String::new(),
             comms: crate::comms::CommsState::new(),
             pipe_filtered: None,
+            watcher_rx: None,
+            manifest_flash: None,
+            dir_watcher: None,
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);
@@ -831,6 +838,14 @@ impl App {
     /// Active pane mutable reference.
     pub fn pane_mut(&mut self) -> &mut PaneState {
         &mut self.panes[self.active_pane]
+    }
+
+    /// Initialize the filesystem watcher for the current directory (#79).
+    pub fn init_watcher(&mut self) {
+        let dir = self.pane().current_dir.clone();
+        let (watcher, rx) = crate::watcher::create_watcher(dir);
+        self.dir_watcher = Some(watcher);
+        self.watcher_rx = Some(rx);
     }
 
     pub fn tick(&mut self) {
@@ -1045,6 +1060,21 @@ impl App {
             }
         }
         if scan_done { self.disk_scan = None; }
+        // Filesystem watcher polling (#79)
+        if let Some(watcher) = &mut self.dir_watcher {
+            watcher.poll();
+        }
+        if let Some(rx) = &self.watcher_rx {
+            if rx.try_recv().is_ok() {
+                self.load_entries();
+                self.manifest_flash = Some(Instant::now());
+            }
+        }
+        if let Some(ts) = &self.manifest_flash {
+            if ts.elapsed().as_secs() >= 2 {
+                self.manifest_flash = None;
+            }
+        }
         // Directory transition animation
         if self.anim_frame > 0 && now.duration_since(self.anim_tick).as_millis() >= 70 {
             self.anim_frame += 1;

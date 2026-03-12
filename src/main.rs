@@ -17,6 +17,7 @@ mod session;
 mod tags;
 mod throbber;
 mod ui;
+mod watcher;
 
 use std::io;
 use std::time::Duration;
@@ -70,6 +71,7 @@ fn main() -> io::Result<()> {
     app.glitch_enabled = cfg.glitch_enabled;
     app.mouse_enabled = cfg.mouse_enabled;
     app.load_entries(); // re-sort with configured sort mode
+    app.init_watcher();
 
     // Show config warnings
     if let Some(warn) = cfg.warnings.first() {
