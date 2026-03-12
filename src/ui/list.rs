@@ -361,6 +361,18 @@ pub fn render_pane(f: &mut Frame, app: &App, pane_idx: usize, area: Rect) {
             }
         }
 
+        // Git status badge (#82)
+        if let Some(status) = app.git_file_statuses.get(&entry.name) {
+            let (badge, color) = match status {
+                crate::gitstatus::GitFileStatus::Added => ("[+]", pal.text_hot),
+                crate::gitstatus::GitFileStatus::Modified => ("[M]", pal.text_mid),
+                crate::gitstatus::GitFileStatus::Untracked => ("[?]", pal.text_dim),
+                crate::gitstatus::GitFileStatus::Staged => ("[S]", pal.text_hot),
+                crate::gitstatus::GitFileStatus::Conflict => ("[!]", pal.warn),
+            };
+            spans.push(Span::styled(badge, Style::default().fg(color).bg(row_bg)));
+        }
+
         // Type badge
         if show_type {
             let badge = file_type_badge(entry);

@@ -3,6 +3,7 @@ mod archive;
 mod comms;
 mod config;
 mod favorites;
+mod gitstatus;
 mod highlight;
 mod input;
 mod logo;

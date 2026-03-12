@@ -738,6 +738,8 @@ pub struct App {
     // Multi-tab workspaces (#81)
     pub tabs: Vec<TabState>,
     pub active_tab: usize,
+    // Git file statuses (#82)
+    pub git_file_statuses: std::collections::HashMap<String, crate::gitstatus::GitFileStatus>,
 }
 
 impl App {
@@ -840,6 +842,7 @@ impl App {
             dir_watcher: None,
             tabs: Vec::new(),
             active_tab: 0,
+            git_file_statuses: std::collections::HashMap::new(),
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);
