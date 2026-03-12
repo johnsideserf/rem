@@ -373,7 +373,7 @@ fn render_telemetry_animation(
     match pal.variant {
         crate::throbber::PaletteVariant::Green => render_radar_sweep(pal, tick, width, rows),
         crate::throbber::PaletteVariant::Amber => render_seismograph(pal, tick, width, rows),
-        crate::throbber::PaletteVariant::Cyan => render_data_waterfall(pal, tick, width, rows),
+        crate::throbber::PaletteVariant::Cyan => render_data_matrix(pal, tick, width, rows),
     }
 }
 
@@ -459,9 +459,9 @@ fn render_seismograph(
     encode_braille_grid(&grid, rows, width, pal.text_hot)
 }
 
-/// Cyan: data throughput waterfall / spectrogram.
-/// Vertical density bars that scroll, like a network traffic heatmap.
-fn render_data_waterfall(
+/// Cyan: data matrix — scattered dots and glyphs shifting in a grid pattern.
+/// Sparse, clinical, with cells that flicker on/off like a live data feed.
+fn render_data_matrix(
     pal: crate::palette::Palette,
     tick: usize,
     width: usize,
@@ -471,24 +471,73 @@ fn render_data_waterfall(
     let dot_w = width * 2;
     let mut grid = vec![vec![0u8; dot_w]; dot_h];
 
-    for col in 0..dot_w {
-        // Each column has a density value derived from hash + tick
-        let t = col.wrapping_add(tick.wrapping_mul(3));
-        let hash = t.wrapping_mul(2654435761) >> 16;
-        let density = (hash % 100) as f64 / 100.0;
+    // Sparse cell grid — each "cell" is ~4x4 dots
+    let cell_w = 4;
+    let cell_h = 4;
+    let cols_count = dot_w / cell_w;
+    let rows_count = dot_h / cell_h;
 
-        // Primary wave pattern
-        let wave = ((col + tick) as f64 * 0.2).sin() * 0.5 + 0.5;
-        let combined = (density * 0.4 + wave * 0.6).min(1.0);
+    for cy in 0..rows_count {
+        for cx in 0..cols_count {
+            // Hash determines if this cell is active at this tick
+            let seed = cx.wrapping_mul(7919).wrapping_add(cy.wrapping_mul(104729));
+            let phase = seed.wrapping_mul(31) % 17;
+            let active = ((tick + phase) / 3) % 5 != 0; // ~80% on, flickering
 
-        // Fill dots from bottom up based on combined intensity
-        let fill_height = (combined * dot_h as f64) as usize;
-        for y in 0..fill_height {
-            let row = dot_h - 1 - y;
-            let brightness = if y < fill_height / 3 { 1 }
-                else if y < fill_height * 2 / 3 { 2 }
-                else { 3 };
-            grid[row][col] = brightness;
+            if !active { continue; }
+
+            // Pattern within active cell varies by hash
+            let pattern = (seed.wrapping_mul(2654435761)) % 6;
+            let bx = cx * cell_w;
+            let by = cy * cell_h;
+
+            match pattern {
+                0 => {
+                    // Single dot — center
+                    let px = bx + cell_w / 2;
+                    let py = by + cell_h / 2;
+                    if px < dot_w && py < dot_h { grid[py][px] = 2; }
+                }
+                1 => {
+                    // Cross
+                    for i in 0..cell_w.min(cell_h) {
+                        let mid = cell_w / 2;
+                        if bx + mid < dot_w && by + i < dot_h { grid[by + i][bx + mid] = 2; }
+                        if bx + i < dot_w && by + mid < dot_h { grid[by + mid][bx + i] = 2; }
+                    }
+                }
+                2 => {
+                    // Corner dots
+                    for &(ox, oy) in &[(0,0), (cell_w-1, 0), (0, cell_h-1), (cell_w-1, cell_h-1)] {
+                        if bx+ox < dot_w && by+oy < dot_h { grid[by+oy][bx+ox] = 1; }
+                    }
+                }
+                3 => {
+                    // Horizontal bar
+                    let mid_y = by + cell_h / 2;
+                    if mid_y < dot_h {
+                        for i in 0..cell_w {
+                            if bx + i < dot_w { grid[mid_y][bx + i] = 3; }
+                        }
+                    }
+                }
+                4 => {
+                    // Diagonal
+                    for i in 0..cell_w.min(cell_h) {
+                        if bx + i < dot_w && by + i < dot_h { grid[by + i][bx + i] = 2; }
+                    }
+                }
+                _ => {
+                    // Scatter — random dots in the cell
+                    for i in 0..3 {
+                        let dx = (seed.wrapping_mul(i + 1).wrapping_add(tick)) % cell_w;
+                        let dy = (seed.wrapping_mul(i + 7).wrapping_add(tick / 2)) % cell_h;
+                        if bx + dx < dot_w && by + dy < dot_h {
+                            grid[by + dy][bx + dx] = if i == 0 { 3 } else { 1 };
+                        }
+                    }
+                }
+            }
         }
     }
 

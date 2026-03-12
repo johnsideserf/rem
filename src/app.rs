@@ -675,6 +675,7 @@ pub struct App {
     pub io_history: Vec<f32>,
     // Idle screen (#17)
     pub last_input: Instant,
+    pub last_tick: Instant,
     pub idle_active: bool,
     pub idle_locked: bool,
     pub distress_active: bool,
@@ -807,6 +808,7 @@ impl App {
             io_flash_tick: 0,
             io_history: vec![0.0; 40],
             last_input: Instant::now(),
+            last_tick: Instant::now(),
             idle_active: false,
             idle_locked: false,
             distress_active: false,
@@ -979,6 +981,11 @@ impl App {
 
     pub fn tick(&mut self) {
         let now = Instant::now();
+        // Gate tick to ~100ms intervals so mouse events don't accelerate animations
+        if now.duration_since(self.last_tick).as_millis() < 90 {
+            return;
+        }
+        self.last_tick = now;
         let blink_interval = self.palette.blink_interval_ms as u128;
         if now.duration_since(self.last_blink).as_millis() >= blink_interval {
             // Amber stutter: skip one toggle every 7th cycle (#37)
