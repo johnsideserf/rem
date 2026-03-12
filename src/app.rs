@@ -676,6 +676,7 @@ pub struct App {
     // Game of Life grid for cyan telemetry animation
     pub gol_grid: Vec<Vec<bool>>,
     pub gol_generation: u32,
+    pub gol_history: Vec<u64>, // ring buffer of recent state hashes for loop detection
     // Idle screen (#17)
     pub last_input: Instant,
     pub last_tick: Instant,
@@ -812,6 +813,7 @@ impl App {
             io_history: vec![0.0; 40],
             gol_grid: Vec::new(),
             gol_generation: 0,
+            gol_history: Vec::new(),
             last_input: Instant::now(),
             last_tick: Instant::now(),
             idle_active: false,
@@ -1014,8 +1016,30 @@ impl App {
         self.gol_generation += 1;
         self.gol_grid = next;
 
-        // Reseed if population dies out or stagnates
-        if alive < 3 || (self.gol_generation > 200 && alive < (h * w) as u32 / 50) {
+        // Hash the grid state for loop/stall detection (FNV-1a)
+        let mut hash: u64 = 0xcbf29ce484222325;
+        for row in &self.gol_grid {
+            for (i, &cell) in row.iter().enumerate() {
+                if cell {
+                    hash ^= i as u64;
+                    hash = hash.wrapping_mul(0x100000001b3);
+                }
+            }
+            hash ^= 0xff;
+            hash = hash.wrapping_mul(0x100000001b3);
+        }
+
+        // Check if this state has been seen recently (still life or oscillator)
+        let is_loop = self.gol_history.contains(&hash);
+
+        // Keep last 20 states — catches oscillators up to period 20
+        self.gol_history.push(hash);
+        if self.gol_history.len() > 20 {
+            self.gol_history.remove(0);
+        }
+
+        // Reseed on: extinction, loop/still life, or prolonged stagnation
+        if alive < 3 || is_loop {
             self.seed_gol(w, h);
         }
     }
@@ -1024,6 +1048,7 @@ impl App {
     pub fn seed_gol(&mut self, w: usize, h: usize) {
         self.gol_grid = vec![vec![false; w]; h];
         self.gol_generation = 0;
+        self.gol_history.clear();
         // Scatter ~25% live cells using LCG
         let mut rng = self.glitch_tick;
         for y in 0..h {
