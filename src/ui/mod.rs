@@ -129,6 +129,7 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     }
 
     footer::render(f, app, outer[5]);
+    statusbar::render_comms_overlay(f, app, outer[5]);
 
     if app.show_theme_picker {
         theme_picker::render(f, app, area);
@@ -254,6 +255,7 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     }
 
     footer::render(f, app, outer[5]);
+    statusbar::render_comms_overlay(f, app, outer[5]);
 
     if app.show_theme_picker {
         theme_picker::render(f, app, area);

@@ -1118,8 +1118,16 @@ impl App {
             self.io_throbber.tick();
             self.io_flash_tick = self.io_flash_tick.saturating_sub(1);
         }
-        // I/O history for oscilloscope (#77)
-        let io_val = (self.io_flash_tick as f32) / 5.0;
+        // I/O history for oscilloscope (#77) — use system activity when available
+        let io_val = if let Some(ref sysmon) = self.sysmon {
+            // Combine CPU load + network IO into a normalized 0.0-1.0 signal
+            let cpu = sysmon.cpu_pct / 100.0;
+            let rate = (sysmon.net.tx_bytes_sec + sysmon.net.rx_bytes_sec) as f32;
+            let net = (rate / 1_000_000.0).min(1.0);
+            (cpu * 0.6 + net * 0.4).min(1.0)
+        } else {
+            (self.io_flash_tick as f32) / 5.0
+        };
         self.io_history.push(io_val);
         if self.io_history.len() > 40 {
             self.io_history.remove(0);
