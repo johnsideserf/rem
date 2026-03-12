@@ -160,6 +160,7 @@ fn run_loop(
                     app.last_input = std::time::Instant::now();
                     app.idle_active = false;
                     app.idle_locked = false;
+                    app.distress_active = false;
                     input::handle_key(app, key);
 
                     if app.should_quit {
@@ -176,6 +177,7 @@ fn run_loop(
                     app.last_input = std::time::Instant::now();
                     app.idle_active = false;
                     app.idle_locked = false;
+                    app.distress_active = false;
                     handle_mouse(app, mouse);
                 }
                 _ => {}

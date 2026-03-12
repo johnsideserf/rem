@@ -665,6 +665,7 @@ pub struct App {
     pub last_input: Instant,
     pub idle_active: bool,
     pub idle_locked: bool,
+    pub distress_active: bool,
     // CRT glitch for cyan (#15)
     pub glitch_tick: u32,
     // SHA-256 hash (#20)
@@ -775,6 +776,7 @@ impl App {
             last_input: Instant::now(),
             idle_active: false,
             idle_locked: false,
+            distress_active: false,
             glitch_tick: 0,
             last_hash: None,
             hash_op: None,
@@ -982,6 +984,8 @@ impl App {
         // Comms intercept (#74)
         let idle_secs = now.duration_since(self.last_input).as_secs();
         self.comms.tick(idle_secs);
+        // Distress signal screensaver (#75)
+        self.distress_active = now.duration_since(self.last_input).as_secs() >= 300;
         // CRT glitch (#15)
         self.glitch_tick = self.glitch_tick.wrapping_add(1);
         // Green phosphor trail: track cursor movement, decay ghosts

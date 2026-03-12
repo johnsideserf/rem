@@ -428,6 +428,12 @@ fn render_idle_overlay(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     let pal = app.palette;
     let logo = crate::logo::logo_for(pal.variant);
 
+    // Distress signal override (#75)
+    if app.distress_active {
+        render_distress(f, app, area);
+        return;
+    }
+
     // Center the logo
     let logo_h = logo.len() as u16;
     let logo_w = logo.first().map(|l| l.len()).unwrap_or(0) as u16;
@@ -535,6 +541,103 @@ fn render_idle_overlay(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         f.render_widget(
             Paragraph::new(msg_line),
             ratatui::layout::Rect::new(msg_x, msg_y, msg_w, 1),
+        );
+    }
+}
+
+/// Distress signal screensaver — pulsing SOS in braille (#75).
+fn render_distress(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+    use ratatui::text::{Line, Span};
+    use ratatui::widgets::{Clear, Paragraph};
+
+    let pal = app.palette;
+    let tick = app.glitch_tick;
+
+    // Dim background
+    f.render_widget(Clear, area);
+    f.render_widget(
+        Block::default().style(Style::default().bg(pal.bg)),
+        area,
+    );
+
+    // SOS in large block letters (7 rows tall)
+    let sos_art = [
+        " ███  ████  ███ ",
+        "█     █  █ █    ",
+        "█     █  █ █    ",
+        " ███  █  █  ███ ",
+        "    █ █  █     █",
+        "    █ █  █     █",
+        " ███  ████  ███ ",
+    ];
+
+    // Pulse between text_hot and text_dim
+    let pulse = if (tick / 5) % 2 == 0 { pal.text_hot } else { pal.text_dim };
+
+    let sos_w = sos_art[0].chars().count() as u16;
+    let sos_h = sos_art.len() as u16;
+    let cx = area.x + (area.width.saturating_sub(sos_w)) / 2;
+    let cy = area.y + (area.height.saturating_sub(sos_h + 10)) / 2;
+
+    for (row, line_str) in sos_art.iter().enumerate() {
+        let y = cy + row as u16;
+        if y >= area.y + area.height { break; }
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                *line_str,
+                Style::default().fg(pulse).bg(pal.bg),
+            ))),
+            ratatui::layout::Rect::new(cx, y, sos_w, 1),
+        );
+    }
+
+    // Coordinates
+    let coords = "26.18N  39.47W  SECTOR 7G";
+    let coords_w = coords.len() as u16;
+    let coords_x = area.x + (area.width.saturating_sub(coords_w)) / 2;
+    let coords_y = cy + sos_h + 2;
+    if coords_y < area.y + area.height {
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                coords,
+                Style::default().fg(pal.text_mid).bg(pal.bg),
+            ))),
+            ratatui::layout::Rect::new(coords_x, coords_y, coords_w, 1),
+        );
+    }
+
+    // DISTRESS BEACON ACTIVE label with throbber
+    let throbber = app.idle_throbber.frame();
+    let beacon_msg = format!("{} DISTRESS BEACON ACTIVE", throbber);
+    let beacon_w = beacon_msg.chars().count() as u16;
+    let beacon_x = area.x + (area.width.saturating_sub(beacon_w)) / 2;
+    let beacon_y = coords_y + 2;
+    if beacon_y < area.y + area.height {
+        let beacon_color = if (tick / 8) % 2 == 0 { pal.warn } else { pal.text_dim };
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                beacon_msg,
+                Style::default().fg(beacon_color).bg(pal.bg),
+            ))),
+            ratatui::layout::Rect::new(beacon_x, beacon_y, beacon_w, 1),
+        );
+    }
+
+    // Timestamp
+    let time_y = beacon_y + 2;
+    if time_y < area.y + area.height {
+        let elapsed = std::time::Instant::now().duration_since(app.last_input).as_secs();
+        let mins = elapsed / 60;
+        let secs = elapsed % 60;
+        let time_str = format!("SIGNAL DURATION: {:02}:{:02}", mins, secs);
+        let time_w = time_str.len() as u16;
+        let time_x = area.x + (area.width.saturating_sub(time_w)) / 2;
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                time_str,
+                Style::default().fg(pal.text_dim).bg(pal.bg),
+            ))),
+            ratatui::layout::Rect::new(time_x, time_y, time_w, 1),
         );
     }
 }
