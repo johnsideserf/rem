@@ -879,7 +879,7 @@ impl App {
 
     /// Close the current tab (#81).
     pub fn close_tab(&mut self) {
-        if self.tabs.len() <= 1 && self.active_tab == 0 {
+        if self.tabs.len() <= 1 {
             // Only one tab (or no saved tabs) -- don't close
             return;
         }
