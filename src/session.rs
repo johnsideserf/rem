@@ -14,7 +14,17 @@ struct SessionFile {
     sort_mode: String,
     show_hidden: bool,
     show_telemetry: bool,
+    #[serde(default = "default_true")]
+    screensaver_enabled: bool,
+    #[serde(default = "default_screensaver_timeout")]
+    screensaver_timeout: u64,
+    #[serde(default = "default_distress_timeout")]
+    distress_timeout: u64,
 }
+
+fn default_true() -> bool { true }
+fn default_screensaver_timeout() -> u64 { 45 }
+fn default_distress_timeout() -> u64 { 300 }
 
 pub struct Session {
     pub left_dir: PathBuf,
@@ -25,6 +35,9 @@ pub struct Session {
     pub sort_mode: SortMode,
     pub show_hidden: bool,
     pub show_telemetry: bool,
+    pub screensaver_enabled: bool,
+    pub screensaver_timeout: u64,
+    pub distress_timeout: u64,
 }
 
 fn session_path() -> Option<PathBuf> {
@@ -84,6 +97,9 @@ pub fn load_session() -> Option<Session> {
         sort_mode: str_to_sort_mode(&file.sort_mode),
         show_hidden: file.show_hidden,
         show_telemetry: file.show_telemetry,
+        screensaver_enabled: file.screensaver_enabled,
+        screensaver_timeout: file.screensaver_timeout,
+        distress_timeout: file.distress_timeout,
     })
 }
 
@@ -101,6 +117,9 @@ pub fn save_session(app: &App) {
         sort_mode: sort_mode_to_str(app.sort_mode).to_string(),
         show_hidden: app.show_hidden,
         show_telemetry: app.show_telemetry,
+        screensaver_enabled: app.screensaver_enabled,
+        screensaver_timeout: app.screensaver_timeout,
+        distress_timeout: app.distress_timeout,
     };
     if let Ok(content) = toml::to_string_pretty(&file) {
         let _ = std::fs::write(&path, content);
@@ -121,6 +140,9 @@ pub fn apply_session(app: &mut App, session: Session) {
     app.sort_mode = session.sort_mode;
     app.show_hidden = session.show_hidden;
     app.show_telemetry = session.show_telemetry;
+    app.screensaver_enabled = session.screensaver_enabled;
+    app.screensaver_timeout = session.screensaver_timeout;
+    app.distress_timeout = session.distress_timeout;
 
     // Initialize sysmon if telemetry was active in the saved session
     if app.show_telemetry && app.sysmon.is_none() {

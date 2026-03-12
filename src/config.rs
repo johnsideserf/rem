@@ -15,6 +15,15 @@ struct ConfigFile {
     behavior: BehaviorConfig,
     #[serde(default)]
     ticker: TickerConfig,
+    #[serde(default)]
+    screensaver: ScreensaverConfig,
+}
+
+#[derive(Deserialize, Default)]
+struct ScreensaverConfig {
+    enabled: Option<bool>,
+    timeout: Option<u64>,
+    distress_timeout: Option<u64>,
 }
 
 #[derive(Deserialize, Default)]
@@ -52,6 +61,9 @@ pub struct Config {
     pub warnings: Vec<String>,
     pub ticker_enabled: bool,
     pub ticker_messages: Vec<String>,
+    pub screensaver_enabled: bool,
+    pub screensaver_timeout: u64,
+    pub distress_timeout: u64,
 }
 
 impl Default for Config {
@@ -69,6 +81,9 @@ impl Default for Config {
             warnings: Vec::new(),
             ticker_enabled: true,
             ticker_messages: Vec::new(), // empty = use app defaults
+            screensaver_enabled: true,
+            screensaver_timeout: 45,
+            distress_timeout: 300,
         }
     }
 }
@@ -244,6 +259,16 @@ impl Config {
                         if !msgs.is_empty() {
                             cfg.ticker_messages = msgs;
                         }
+                    }
+                    // Screensaver config (#107)
+                    if let Some(v) = file.screensaver.enabled {
+                        cfg.screensaver_enabled = v;
+                    }
+                    if let Some(v) = file.screensaver.timeout {
+                        cfg.screensaver_timeout = v;
+                    }
+                    if let Some(v) = file.screensaver.distress_timeout {
+                        cfg.distress_timeout = v;
                     }
                 }
             }

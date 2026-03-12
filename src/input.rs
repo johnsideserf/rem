@@ -1644,14 +1644,47 @@ fn execute_command(app: &mut App, cmd: &str) {
             }
         }
         Some("set") => {
-            match parts.get(1).map(|s| s.trim()) {
-                Some("hidden") => { app.show_hidden = true; app.rebuild_filtered(); }
-                Some("nohidden") => { app.show_hidden = false; app.rebuild_filtered(); }
-                Some("minimap") => { app.show_minimap = true; }
-                Some("nominimap") => { app.show_minimap = false; }
-                _ => {
-                    app.error = Some(("UNKNOWN PARAMETER".to_string(), Instant::now()));
+            let param = parts.get(1).map(|s| s.trim()).unwrap_or("");
+            if param == "hidden" {
+                app.show_hidden = true;
+                app.rebuild_filtered();
+            } else if param == "nohidden" {
+                app.show_hidden = false;
+                app.rebuild_filtered();
+            } else if param == "minimap" {
+                app.show_minimap = true;
+            } else if param == "nominimap" {
+                app.show_minimap = false;
+            } else if param == "screensaver" {
+                app.screensaver_enabled = true;
+                app.error = Some(("SCREENSAVER ENABLED".to_string(), Instant::now()));
+            } else if param == "noscreensaver" {
+                app.screensaver_enabled = false;
+                app.idle_active = false;
+                app.distress_active = false;
+                app.error = Some(("SCREENSAVER DISABLED".to_string(), Instant::now()));
+            } else if let Some(val) = param.strip_prefix("screensaver_timeout=") {
+                match val.parse::<u64>() {
+                    Ok(secs) => {
+                        app.screensaver_timeout = secs;
+                        app.error = Some((format!("SCREENSAVER TIMEOUT: {}s", secs), Instant::now()));
+                    }
+                    Err(_) => {
+                        app.error = Some(("INVALID TIMEOUT VALUE".to_string(), Instant::now()));
+                    }
                 }
+            } else if let Some(val) = param.strip_prefix("distress_timeout=") {
+                match val.parse::<u64>() {
+                    Ok(secs) => {
+                        app.distress_timeout = secs;
+                        app.error = Some((format!("DISTRESS TIMEOUT: {}s", secs), Instant::now()));
+                    }
+                    Err(_) => {
+                        app.error = Some(("INVALID TIMEOUT VALUE".to_string(), Instant::now()));
+                    }
+                }
+            } else {
+                app.error = Some(("UNKNOWN PARAMETER".to_string(), Instant::now()));
             }
         }
         Some("sort") => {

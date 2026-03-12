@@ -77,6 +77,9 @@ fn main() -> io::Result<()> {
     if !cfg.ticker_messages.is_empty() {
         app.ticker_messages = cfg.ticker_messages;
     }
+    app.screensaver_enabled = cfg.screensaver_enabled;
+    app.screensaver_timeout = cfg.screensaver_timeout;
+    app.distress_timeout = cfg.distress_timeout;
     app.load_entries(); // re-sort with configured sort mode
     app.init_watcher();
 

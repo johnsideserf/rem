@@ -756,6 +756,10 @@ pub struct App {
     pub ticker_messages: Vec<String>,
     pub ticker_offset: usize,
     pub ticker_enabled: bool,
+    // Screensaver toggle and timeouts (#107)
+    pub screensaver_enabled: bool,
+    pub screensaver_timeout: u64,
+    pub distress_timeout: u64,
 }
 
 impl App {
@@ -875,6 +879,9 @@ impl App {
             ],
             ticker_offset: 0,
             ticker_enabled: true,
+            screensaver_enabled: true,
+            screensaver_timeout: 45,
+            distress_timeout: 300,
         };
         app.load_entries();
         app.git_info = GitInfo::detect(&app.panes[0].current_dir);
@@ -1221,13 +1228,15 @@ impl App {
         }
         // Idle detection (#17) — don't override manual lock
         if !self.idle_locked {
-            self.idle_active = now.duration_since(self.last_input).as_secs() >= 45;
+            self.idle_active = self.screensaver_enabled
+                && now.duration_since(self.last_input).as_secs() >= self.screensaver_timeout;
         }
         // Comms intercept (#74)
         let idle_secs = now.duration_since(self.last_input).as_secs();
         self.comms.tick(idle_secs);
         // Distress signal screensaver (#75)
-        self.distress_active = now.duration_since(self.last_input).as_secs() >= 300;
+        self.distress_active = self.distress_timeout > 0
+            && now.duration_since(self.last_input).as_secs() >= self.distress_timeout;
         // CRT glitch (#15)
         self.glitch_tick = self.glitch_tick.wrapping_add(1);
         // Game of Life evolution for cyan telemetry (#77) — every other tick (~200ms)
