@@ -1230,8 +1230,10 @@ impl App {
         self.distress_active = now.duration_since(self.last_input).as_secs() >= 300;
         // CRT glitch (#15)
         self.glitch_tick = self.glitch_tick.wrapping_add(1);
-        // Game of Life evolution for cyan telemetry (#77)
-        if self.show_telemetry && matches!(self.palette.variant, crate::throbber::PaletteVariant::Cyan) {
+        // Game of Life evolution for cyan telemetry (#77) — every other tick (~200ms)
+        if self.show_telemetry && matches!(self.palette.variant, crate::throbber::PaletteVariant::Cyan)
+            && self.glitch_tick % 2 == 0
+        {
             self.tick_gol();
         }
         // Header ticker scroll (#88)
