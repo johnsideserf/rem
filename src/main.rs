@@ -84,6 +84,7 @@ fn main() -> io::Result<()> {
     app.comms.feeds = cfg.comms_feeds;
     app.comms.custom_messages = cfg.comms_custom_messages;
     app.comms.refresh_interval_mins = cfg.comms_refresh_interval;
+    app.comms.display_secs = cfg.comms_display_time;
     app.comms.rss_items = crate::comms::load_comms_cache();
     app.load_entries(); // re-sort with configured sort mode
     app.init_watcher();

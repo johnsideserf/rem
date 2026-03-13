@@ -11,9 +11,9 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     let pal = app.palette;
     let channel_count = Channel::ALL_CHANNELS.len();
 
-    // Height: border(2) + title(1) + blank(1) + channels + blank(1) + feed info(1) + refresh(1)
+    // Height: border(2) + title(1) + blank(1) + channels + blank(1) + feed info(1) + refresh(1) + display(1) + hint(1)
     let box_w: u16 = 46;
-    let box_h: u16 = channel_count as u16 + 8;
+    let box_h: u16 = channel_count as u16 + 10;
 
     let x = area.x + area.width.saturating_sub(box_w) / 2;
     let y = area.y + area.height.saturating_sub(box_h) / 2;
@@ -90,6 +90,12 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     };
     lines.push(Line::from(Span::styled(
         refresh_info,
+        Style::default().fg(pal.text_dim),
+    )));
+
+    // Display duration
+    lines.push(Line::from(Span::styled(
+        format!(" DISPLAY: {}s  [-/+]", app.comms.display_secs),
         Style::default().fg(pal.text_dim),
     )));
 

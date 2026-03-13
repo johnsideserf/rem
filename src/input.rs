@@ -324,6 +324,11 @@ fn handle_normal(app: &mut App, key: KeyEvent) {
                 crate::throbber::PaletteVariant::Cyan => 2,
             };
         }
+        // COMMS channel selector (#105)
+        (KeyModifiers::SHIFT, KeyCode::Char('C')) => {
+            app.comms.show_selector = true;
+            app.comms.selector_cursor = 0;
+        }
         // Clipboard yank (#39)
         (KeyModifiers::SHIFT, KeyCode::Char('Y')) => {
             clipboard_yank(app);
@@ -983,6 +988,15 @@ fn handle_comms_selector(app: &mut App, key: KeyEvent) {
             app.comms.set_channel(channel);
             crate::config::save_comms_channel(channel);
             app.comms.show_selector = false;
+        }
+        // Display time adjustment
+        (_, KeyCode::Char('+')) | (_, KeyCode::Char('=')) | (_, KeyCode::Right) => {
+            app.comms.display_secs = app.comms.display_secs.saturating_add(1).min(30);
+            crate::config::save_comms_display_time(app.comms.display_secs);
+        }
+        (_, KeyCode::Char('-')) | (_, KeyCode::Left) => {
+            app.comms.display_secs = app.comms.display_secs.saturating_sub(1).max(1);
+            crate::config::save_comms_display_time(app.comms.display_secs);
         }
         _ => {}
     }

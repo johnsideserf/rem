@@ -244,6 +244,7 @@ pub struct CommsState {
     pub fetch_rx: Option<std::sync::mpsc::Receiver<Vec<RssItem>>>,
     pub show_selector: bool,
     pub selector_cursor: usize,
+    pub display_secs: u8,
 }
 
 impl CommsState {
@@ -262,6 +263,7 @@ impl CommsState {
             fetch_rx: None,
             show_selector: false,
             selector_cursor: 0,
+            display_secs: 8,
         }
     }
 
@@ -295,7 +297,7 @@ impl CommsState {
             return;
         }
         if let Some((_, ts)) = &self.current {
-            if ts.elapsed().as_secs() >= 3 { self.current = None; }
+            if ts.elapsed().as_secs() >= self.display_secs as u64 { self.current = None; }
         }
         if self.current.is_none() && self.last_comms.elapsed().as_secs() >= 8 {
             self.last_comms = Instant::now();

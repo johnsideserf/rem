@@ -347,11 +347,8 @@ fn render_network(f: &mut Frame, app: &mut App, area: Rect) {
         }
         let tick = app.glitch_tick as usize;
         let anim_lines = render_telemetry_animation(app, tick, anim_width, anim_rows);
-        for (text, color) in anim_lines {
-            lines.push(Line::from(Span::styled(
-                format!(" {}", text),
-                Style::default().fg(color).bg(pal.bg),
-            )));
+        for line in anim_lines {
+            lines.push(line);
         }
     }
 
@@ -377,16 +374,35 @@ fn render_telemetry_animation(
     tick: usize,
     width: usize,
     rows: usize,
-) -> Vec<(String, ratatui::style::Color)> {
+) -> Vec<Line<'static>> {
     let pal = app.palette;
     if rows == 0 || width == 0 {
         return vec![];
     }
     match pal.variant {
-        crate::throbber::PaletteVariant::Green => render_radar_sweep(pal, tick, width, rows),
-        crate::throbber::PaletteVariant::Amber => render_seismograph(pal, tick, width, rows),
+        crate::throbber::PaletteVariant::Green => {
+            wrap_single_color(render_radar_sweep(pal, tick, width, rows), pal.bg)
+        }
+        crate::throbber::PaletteVariant::Amber => {
+            wrap_single_color(render_seismograph(pal, tick, width, rows), pal.bg)
+        }
         crate::throbber::PaletteVariant::Cyan => render_game_of_life(app, width, rows),
     }
+}
+
+/// Convert single-color animation rows into Lines with left padding.
+fn wrap_single_color(
+    rows: Vec<(String, ratatui::style::Color)>,
+    bg: ratatui::style::Color,
+) -> Vec<Line<'static>> {
+    rows.into_iter()
+        .map(|(text, color)| {
+            Line::from(Span::styled(
+                format!(" {}", text),
+                Style::default().fg(color).bg(bg),
+            ))
+        })
+        .collect()
 }
 
 /// Green: horizontal radar sweep with phosphor echo decay.
@@ -472,27 +488,94 @@ fn render_seismograph(
 }
 
 /// Cyan: Conway's Game of Life cellular automaton.
-/// Reads live state from app.gol_grid, encodes to braille.
+/// Inverted display: dead cells are bright dots, alive cells are voids.
+/// Per-character color varies by neighbor proximity — dead cells near
+/// living clusters dim, creating a gradient halo around dense regions.
 fn render_game_of_life(
     app: &App,
     width: usize,
     rows: usize,
-) -> Vec<(String, ratatui::style::Color)> {
+) -> Vec<Line<'static>> {
     let pal = app.palette;
-    let dot_h = rows * 4;
-    let dot_w = width * 2;
+    let h = app.gol_grid.len();
+    if h == 0 { return vec![]; }
+    let w = app.gol_grid[0].len();
+    if w == 0 { return vec![]; }
 
-    // Build grid from GoL state (may be different size — clamp to fit)
-    let mut grid = vec![vec![0u8; dot_w]; dot_h];
-    for y in 0..dot_h {
-        for x in 0..dot_w {
-            if y < app.gol_grid.len() && x < app.gol_grid[0].len() && app.gol_grid[y][x] {
-                grid[y][x] = 2;
+    // Pre-compute neighbor counts for dead-cell weighting
+    let mut nbr = vec![vec![0u8; w]; h];
+    for y in 0..h {
+        for x in 0..w {
+            let mut count = 0u8;
+            for dy in [h - 1, 0, 1] {
+                for dx in [w - 1, 0, 1] {
+                    if dy == 0 && dx == 0 { continue; }
+                    if app.gol_grid[(y + dy) % h][(x + dx) % w] {
+                        count += 1;
+                    }
+                }
             }
+            nbr[y][x] = count;
         }
     }
 
-    encode_braille_grid(&grid, rows, width, pal.text_hot)
+    let braille_dots: [(usize, usize, u32); 8] = [
+        (0,0,1), (0,1,2), (0,2,4), (0,3,64),
+        (1,0,8), (1,1,16), (1,2,32), (1,3,128),
+    ];
+
+    let mut result = Vec::with_capacity(rows);
+    for row in 0..rows {
+        let mut spans: Vec<Span<'static>> = Vec::with_capacity(width + 1);
+        spans.push(Span::styled(" ".to_string(), Style::default().bg(pal.bg)));
+
+        for col in 0..width {
+            let bx = col * 2;
+            let by = row * 4;
+            let mut cp: u32 = 0x2800;
+            let mut weight_sum: u32 = 0;
+            let mut on_count: u32 = 0;
+
+            for &(ox, oy, bit) in &braille_dots {
+                let gx = bx + ox;
+                let gy = by + oy;
+                let alive = gx < w && gy < h && app.gol_grid[gy][gx];
+
+                if !alive {
+                    // Inverted: dead cells light up as dots
+                    cp |= bit;
+                    on_count += 1;
+                    // Weight by neighbor count — dimmer near living clusters
+                    let n = if gx < w && gy < h { nbr[gy][gx] } else { 0 };
+                    weight_sum += match n {
+                        0 => 3,     // far from life → bright
+                        1..=2 => 2, // near life → medium
+                        _ => 1,     // surrounded by life → dim
+                    };
+                }
+            }
+
+            let ch = char::from_u32(cp).unwrap_or(' ');
+            let color = if on_count == 0 {
+                pal.bg
+            } else {
+                let avg = weight_sum / on_count;
+                match avg {
+                    3 => pal.text_hot,
+                    2 => pal.text_mid,
+                    _ => pal.text_dim,
+                }
+            };
+
+            spans.push(Span::styled(
+                String::from(ch),
+                Style::default().fg(color).bg(pal.bg),
+            ));
+        }
+
+        result.push(Line::from(spans));
+    }
+    result
 }
 
 /// Encode a dot grid into braille characters.

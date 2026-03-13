@@ -63,17 +63,19 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     } else {
         0
     };
+    let comms_height: u16 = if app.comms.current.is_some() { 1 } else { 0 };
     let footer_height = footer::required_height(app, area.width);
 
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(2),             // header + border
-            Constraint::Length(2),             // breadcrumb + border
-            Constraint::Min(3),               // body
-            Constraint::Length(telem_height),  // telemetry (conditional)
-            Constraint::Length(status_height), // status bar (conditional)
-            Constraint::Length(footer_height), // footer (wraps)
+            Constraint::Length(2),             // [0] header + border
+            Constraint::Length(2),             // [1] breadcrumb + border
+            Constraint::Min(3),               // [2] body
+            Constraint::Length(comms_height),  // [3] comms intercept (conditional)
+            Constraint::Length(telem_height),  // [4] telemetry (conditional)
+            Constraint::Length(status_height), // [5] status bar (conditional)
+            Constraint::Length(footer_height), // [6] footer (wraps)
         ])
         .split(area);
 
@@ -121,16 +123,17 @@ fn render_single(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
         }
     }
 
+    statusbar::render_comms_overlay(f, app, outer[3]);
+
     if app.show_telemetry {
-        telemetry::render(f, app, outer[3]);
+        telemetry::render(f, app, outer[4]);
     }
 
     if show_status {
-        statusbar::render(f, app, outer[4]);
+        statusbar::render(f, app, outer[5]);
     }
 
-    footer::render(f, app, outer[5]);
-    statusbar::render_comms_overlay(f, app, outer[5]);
+    footer::render(f, app, outer[6]);
 
     if app.show_theme_picker {
         theme_picker::render(f, app, area);
@@ -173,17 +176,19 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     } else {
         0
     };
+    let comms_height: u16 = if app.comms.current.is_some() { 1 } else { 0 };
     let footer_height = footer::required_height(app, area.width);
 
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(2),             // header
-            Constraint::Length(2),             // breadcrumbs (both panes)
-            Constraint::Min(3),               // body (both panes)
-            Constraint::Length(telem_height),  // telemetry
-            Constraint::Length(status_height), // status bar
-            Constraint::Length(footer_height), // footer (wraps)
+            Constraint::Length(2),             // [0] header
+            Constraint::Length(2),             // [1] breadcrumbs (both panes)
+            Constraint::Min(3),               // [2] body (both panes)
+            Constraint::Length(comms_height),  // [3] comms intercept (conditional)
+            Constraint::Length(telem_height),  // [4] telemetry
+            Constraint::Length(status_height), // [5] status bar
+            Constraint::Length(footer_height), // [6] footer (wraps)
         ])
         .split(area);
 
@@ -251,16 +256,17 @@ fn render_dual(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
 
     } // end else (non-Edit mode body rendering)
 
+    statusbar::render_comms_overlay(f, app, outer[3]);
+
     if app.show_telemetry {
-        telemetry::render(f, app, outer[3]);
+        telemetry::render(f, app, outer[4]);
     }
 
     if show_status {
-        statusbar::render(f, app, outer[4]);
+        statusbar::render(f, app, outer[5]);
     }
 
-    footer::render(f, app, outer[5]);
-    statusbar::render_comms_overlay(f, app, outer[5]);
+    footer::render(f, app, outer[6]);
 
     if app.show_theme_picker {
         theme_picker::render(f, app, area);
