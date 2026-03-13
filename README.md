@@ -65,10 +65,11 @@ A corporate-grade terminal file navigator built in Rust with [ratatui](https://r
 - **File integrity** -- `#` to compute SHA-256 hash of selected file
 - **Disk usage** -- `W` to scan recursive directory size allocation
 - **Archive browsing** -- inspect zip/tar contents as a virtual read-only directory
-- **Lock screen** -- `L` to activate per-palette animated screensaver with braille art
+- **Lock screen** -- `L` to activate per-palette animated screensaver with braille art, configurable timeout and enable/disable
 - **Boot sequence** -- per-palette corporate authentication splash with animated WY mark
 - **Per-palette throbbers** -- 5 throbber types (DataStream, Processing, Heartbeat, Scanning, Idle) with unique frame sets per display profile
-- **COMMS INTERCEPT** -- ambient Weyland-Yutani lore messages surface during idle periods (LV-426 beacons, corporate directives, crew manifests)
+- **COMMS INTERCEPT** -- 100+ lore-accurate messages across 5 channels (Corporate, USCM, Deep Space, Synthetic, Science) surface during idle periods
+- **COMMS feed selector** -- `C` to open channel tuner, subscribe to RSS/Atom feeds, add custom messages, configurable via `config.toml`
 - **Distress signal screensaver** -- after extended idle, a pulsing braille SOS distress beacon with fake coordinates replaces the standard screensaver
 - **CRT warm-up** -- phosphor ramp-up animation before boot sequence, simulating CRT cathode heating
 - **I/O waveform** -- real-time braille oscilloscope in telemetry panel driven by CPU load and network throughput
@@ -187,6 +188,10 @@ Each profile includes unique throbber animations (radar/seismograph/diamond scan
 | `:close` | Close current tab |
 | `:set hidden / nohidden` | Toggle hidden files |
 | `:set minimap / nominimap` | Toggle preview minimap |
+| `:set screensaver / noscreensaver` | Toggle screensaver |
+| `:set screensaver_timeout=N` | Set screensaver timeout in seconds |
+| `:comms` | Open COMMS channel selector |
+| `:comms <channel>` | Set COMMS channel (all/corporate/uscm/deepspace/synthetic/rss/custom) |
 | `:sort name\|size\|date` | Set sort mode |
 | `:theme green\|amber\|cyan` | Switch display profile |
 | `:symbols <variant>` | Switch symbol set |

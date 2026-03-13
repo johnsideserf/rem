@@ -641,7 +641,7 @@
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">FILE INTEGRITY</span><span class="feature-desc"># to compute SHA-256 hash of selected file</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">DISK USAGE</span><span class="feature-desc">W to scan recursive directory size allocation</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">ARCHIVE BROWSING</span><span class="feature-desc">Inspect zip/tar contents as a virtual read-only directory</span></li>
-        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">LOCK SCREEN</span><span class="feature-desc">L to activate per-palette animated screensaver with braille art</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">LOCK SCREEN</span><span class="feature-desc">L to activate per-palette animated screensaver with braille art, configurable timeout and enable/disable</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">BOOT SEQUENCE</span><span class="feature-desc">Per-palette corporate authentication splash with animated WY mark</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">PER-PALETTE THROBBERS</span><span class="feature-desc">5 throbber types (DataStream, Processing, Heartbeat, Scanning, Idle) with unique frame sets per profile</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">LORE-ACCURATE ERRORS</span><span class="feature-desc">All messages use in-universe WY corporate language: ACCESS VIOLATION, PURGE SEQUENCE, DESIGNATION CONFLICT</span></li>
@@ -657,7 +657,8 @@
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">IMAGE PREVIEW</span><span class="feature-desc">Braille-art rendering of PNG, JPG, GIF, BMP, WebP images in preview pane</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">TREE VIEW</span><span class="feature-desc">T to toggle hierarchical directory tree with lazy-loaded expand/collapse</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">DUAL-PANE DIFF</span><span class="feature-desc">Ctrl+X to highlight files unique to each pane vs common entries</span></li>
-        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">COMMS INTERCEPT</span><span class="feature-desc">Ambient Weyland-Yutani lore messages surface during idle (LV-426 beacons, corporate directives, crew manifests)</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">COMMS INTERCEPT</span><span class="feature-desc">100+ lore-accurate messages across 5 channels (Corporate, USCM, Deep Space, Synthetic, Science) surface during idle</span></li>
+        <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">COMMS FEED SELECTOR</span><span class="feature-desc">C to open channel tuner, subscribe to RSS/Atom feeds, add custom messages, configurable via config.toml</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">DISTRESS SIGNAL</span><span class="feature-desc">Pulsing braille SOS distress beacon with fake coordinates after extended idle</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">CRT WARM-UP</span><span class="feature-desc">Phosphor ramp-up animation before boot sequence simulating CRT cathode heating</span></li>
         <li><span class="feature-sigil">&#x25b6;</span><span class="feature-label">I/O WAVEFORM</span><span class="feature-desc">Real-time braille oscilloscope in telemetry panel driven by CPU load and network throughput</span></li>
@@ -863,6 +864,10 @@
         <tr><td class="cmd-key">:symbols &lt;variant&gt;</td><td class="cmd-desc">Switch symbol set</td></tr>
         <tr><td class="cmd-key">:close</td><td class="cmd-desc">Close current tab</td></tr>
         <tr><td class="cmd-key">:set minimap / nominimap</td><td class="cmd-desc">Toggle preview minimap</td></tr>
+        <tr><td class="cmd-key">:set screensaver / noscreensaver</td><td class="cmd-desc">Toggle screensaver</td></tr>
+        <tr><td class="cmd-key">:set screensaver_timeout=N</td><td class="cmd-desc">Set screensaver timeout in seconds</td></tr>
+        <tr><td class="cmd-key">:comms</td><td class="cmd-desc">Open COMMS channel selector</td></tr>
+        <tr><td class="cmd-key">:comms &lt;channel&gt;</td><td class="cmd-desc">Set COMMS channel (all/corporate/uscm/deepspace/synthetic/rss/custom)</td></tr>
         <tr><td class="cmd-key">:rm &lt;glob&gt;</td><td class="cmd-desc">Remove files matching glob pattern</td></tr>
         <tr><td class="cmd-key">:cp &lt;glob&gt; &lt;dest&gt;</td><td class="cmd-desc">Copy files matching glob pattern</td></tr>
         <tr><td class="cmd-key">:mv &lt;glob&gt; &lt;dest&gt;</td><td class="cmd-desc">Move files matching glob pattern</td></tr>
@@ -908,7 +913,23 @@
 <span class="config-comment"># Header ticker</span>
 <span class="config-key">[ticker]</span>
 <span class="config-key">enabled</span> = <span class="config-val">true</span>                 <span class="config-comment"># scrolling header messages</span>
-<span class="config-key">messages</span> = <span class="config-val">["BUILDING BETTER WORLDS", "COMPANY PROPERTY"]</span></div>
+<span class="config-key">messages</span> = <span class="config-val">["BUILDING BETTER WORLDS", "COMPANY PROPERTY"]</span>
+
+<span class="config-comment"># Screensaver</span>
+<span class="config-key">[screensaver]</span>
+<span class="config-key">enabled</span> = <span class="config-val">true</span>                 <span class="config-comment"># enable idle screensaver</span>
+<span class="config-key">timeout</span> = <span class="config-val">45</span>                   <span class="config-comment"># seconds before screensaver activates</span>
+<span class="config-key">distress_timeout</span> = <span class="config-val">300</span>        <span class="config-comment"># seconds before distress beacon mode</span>
+
+<span class="config-comment"># COMMS INTERCEPT</span>
+<span class="config-key">[comms]</span>
+<span class="config-key">channel</span> = <span class="config-val">"all"</span>               <span class="config-comment"># all | corporate | uscm | deepspace | synthetic | rss | custom</span>
+<span class="config-key">custom_messages</span> = <span class="config-val">["CUSTOM BROADCAST ONE"]</span>
+<span class="config-key">refresh_interval</span> = <span class="config-val">1800</span>      <span class="config-comment"># RSS feed refresh interval in seconds</span>
+
+<span class="config-comment"># [[comms.feeds]]</span>
+<span class="config-comment"># name = "My Feed"</span>
+<span class="config-comment"># url = "https://example.com/rss"</span></div>
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════
